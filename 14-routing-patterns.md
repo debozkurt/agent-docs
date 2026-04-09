@@ -327,6 +327,32 @@ Don't dump the full conversation history into the router — that defeats its pu
 
 Embedding-based routers struggle more with this kind of context-dependent input. That's the case where falling through to an LLM matters.
 
+## Sticky state should bypass the router
+
+The "yes please" section above is about giving the router *just enough* context to disambiguate. This section is the next step beyond that: when prior state is rich enough, you don't need the router to weigh anything — the answer is already obvious and the router is wasted work.
+
+Most intents are stateless — each turn classifies independently. But some flows are sticky: once the system has shown the user a list of available appointment slots, the next turn is overwhelmingly likely to be a slot selection ("the 3pm one", "yeah that works"), not a fresh classification. Asking the LLM router to figure that out on every turn is wasteful and error-prone — the model has to weigh "is this a slot pick?" against every other intent, when the prior turn already made the answer obvious.
+
+The fix is a pre-router gate that fires when sticky state is present:
+
+```
+preprocess → fast_path_check → sticky_state_check → router → handler
+                                       │
+                                       └─ if a sticky flow is active AND
+                                          the message looks like a continuation,
+                                          set the intent directly and skip
+                                          the LLM router entirely
+```
+
+The check is two parts. First, **state from a prior turn** — the slots that were shown, the document being collected, the wizard step being filled. Second, a **lightweight pattern match** on the current message — does it contain a time reference, a confirmation phrase, an ordinal ("the second one"). When both fire, the intent is determined and you save the LLM call.
+
+Two reasons this matters beyond the cost savings:
+
+- **Routing becomes deterministic for the flows that need to be deterministic.** A booking flow that occasionally misroutes "the 3pm one" into a small-talk response is worse than one that costs an extra penny per turn. State-driven gates make that misroute structurally impossible.
+- **The side effect is observable at one decision point**, not buried in a handler that's reverse-engineering user intent from prose. If you want to know why a booking happened, you look at the gate, not at the LLM's reasoning.
+
+Don't fast-path everything. The gate should only fire when the state-message combination is unambiguous. If you find yourself adding heuristics for borderline cases, those belong in the LLM router where the model can weigh history. The pre-router gate is for the cases where state genuinely makes the answer obvious — slot selection after slots were shown, "yes" after a confirmation prompt, the next field in a multi-step form.
+
 ## Heuristic
 
 > **Routing is a set of trade-offs, not a single best practice. Pick the approach that matches your latency budget, accuracy needs, intent shape, and framework. Embedding-based routing is the most underrated option; agent handoffs are the most underrated alternative to upstream routing entirely.**

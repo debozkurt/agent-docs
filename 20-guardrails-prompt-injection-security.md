@@ -63,6 +63,17 @@ A few practices that aren't injection-specific but are easy to get wrong:
 
 **Authenticate the *user*, not the agent.** When an agent acts on behalf of a user, the downstream system should see the user's identity and permissions, not a service account that can do anything. Pass the user's auth token through to tool calls and let the downstream system enforce.
 
+**Internal service keys are not user identities.** A common pattern in LLM systems: the agent service authenticates to a backend with a shared `X-Internal-Service-Key` header, then makes calls "on behalf of" various users. The backend trusts the key to mean *"this call came from the agent service"* — which is true and useful — but then accepts the user identifier from the request body without verifying anything. The result is a cross-tenant write primitive: anyone who can influence the request body (a buggy code path, a prompt-injected agent, a future maintainer who copies the wrong field into the wrong call) can substitute someone else's user_id and the backend will mutate the wrong user's data. The internal key proves *who is calling*. It does not prove *which user the call is for*. Those are different claims and need different defenses.
+
+The fix template:
+
+1. Require the user identifier in every internal write payload, distinct from the resource identifier.
+2. The backend independently verifies the user has access to the resource — owner, member, agent on the linked transaction, whatever ownership model your data uses.
+3. Return 404 on access denial, not 403 — don't leak resource existence to a misbehaving caller.
+4. The agent service sources the user identifier from a server-trusted channel (the request JWT), never from client-supplied state like a `page_context` field that the frontend sends along.
+
+The stronger version is HMAC-signing the user identifier with the internal key so the backend can verify the agent service didn't tamper with it either. Worth the extra plumbing for high-blast-radius operations — anything that decrements credits, sends notifications, or moves money. Overkill for read endpoints. Pick the level of defense that matches the cost of the worst-case write.
+
 ## Heuristic
 
 > **Assume the model will eventually do the wrong thing. Design so the wrong thing has the smallest possible blast radius — small toolset for risky inputs, scoped credentials, sandboxed execution, approval gates on destructive actions, defense in depth on prompt injection.**

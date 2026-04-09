@@ -87,7 +87,15 @@ Long conversations bloat the context window. You'll need to trim:
 - **Summarize older sections** ("conversation so far: X")
 - **Keep only the last N turns** (the simplest)
 
-Three turns is a good default for tight, action-oriented agents. More for exploratory or reference-y assistants. Always include the system message and the current user message; trim the middle.
+How many turns to keep is a real tuning decision, not a default to copy. Too few and the model loses references like "the 3pm one" or "what about Plano instead" — anything that resolves against earlier context. Too many and you pay tokens for stale state and risk the model anchoring on something unrelated from twenty turns ago.
+
+A few rules of thumb that scale with the agent's job:
+
+- **Tight, action-oriented agents** (todo CRUD, single-purpose tools) can usually live on 4–8 turns because each turn is mostly self-contained.
+- **Conversational agents with carry-forward references** ("what about Plano?", "the second one") need more — often 10–20 turns, sometimes the whole session.
+- **Multi-step reasoning across many tool calls** needs every tool message from the current task chain. Don't trim mid-task.
+
+Always include the system message and the current user message; trim the middle. If you're not sure where to start, pick a number that feels generous, watch real conversations for context-resolution failures, and trim down. Under-keeping breaks behavior in subtle ways that are hard to attribute; over-keeping costs money but you'll see it in the bill. The first failure mode is more expensive than the second.
 
 Long-term context that needs to survive trimming should live in external memory (Chapter 10), not in the message list.
 

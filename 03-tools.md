@@ -125,6 +125,16 @@ Strict mode does double duty. Most people think of it as input validation, but t
 
 Treat tools, then, as a *bidirectional* typed interface: strict input schemas constrain what the model sends in, and structured returns constrain what your code reads out. Both halves are part of the same discipline.
 
+## Tool binding is your safety boundary
+
+There's a related decision that gets less attention than it deserves: which tools the model can call on a given turn. That set is determined when you bind tools to the model (`llm.bind_tools([...])`, `Agent(tools=[...])`, or whatever your framework calls it), and the resulting set is the **strongest safety constraint in the agent**.
+
+Prompts can be ignored. The model can hallucinate a tool name. Runtime validators can be bypassed by a future refactor. But a tool that isn't in the bound set *literally cannot be called* — there's no function for the model to invoke. This is a hard constraint enforced by the framework, not a soft constraint enforced by the model's good behavior.
+
+Use the property deliberately. Read-only handlers should bind only read tools. Write handlers should bind only the writes they need. If you've split into specialized sub-agents (Chapter 13–14), each one should bind the minimum tool set for its job — not the union of everything any specialist might want. A "query" agent that has the write tools available is one prompt failure away from mutating state it had no business touching.
+
+The discipline this enables is the **negative assertion in tests**: not "this handler calls the right tool" but "this handler must NOT have any write tools bound at all." The negative version is stricter and catches the failure mode that matters — a future refactor that accidentally widens the bound set, or a copy-paste error that gives a read-only handler the full toolkit. A one-line test (`assert WRITE_TOOLS.isdisjoint(agent.bound_tools)`) is the strongest safety check available, because it doesn't depend on the model behaving well at runtime.
+
 ## Tool ecosystems: a quick note on MCP
 
 Beyond your own application, tools have an emerging open standard: the **Model Context Protocol (MCP)**, introduced by Anthropic in late 2024 and now broadly adopted across Claude, ChatGPT, Cursor, VS Code, Claude Code, and others. MCP turns tools from app-internal functions into portable, isolated services with their own trust scope. It's a big enough topic — and a big enough architectural shift — to deserve its own chapter; the next one is about it.

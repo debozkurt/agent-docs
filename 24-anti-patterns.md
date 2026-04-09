@@ -18,6 +18,8 @@ Each anti-pattern has a name, the symptom you'll see, the root cause, and the fi
 
 **Fix**: Identify the major intents the user has (3–5 typically). Split into specialized sub-agents with a router. Each sub-agent gets 1–4 tools and a focused prompt. (Chapter 13–14.)
 
+If you've already shipped a kitchen sink and rewriting it feels like a multi-week risk, don't rewrite. Use the strangler approach: build the new router and the new sub-agent layer alongside the old code, route the intents that have new handlers through the new path, and fall through to the existing handlers for everything else. Migrate one intent at a time as a small focused PR — six new handlers among twelve old ones still gives you production traffic on the new code path for those six. Each migration is independently reversible. Once every intent is on the new path, delete the old code in one final cleanup. The thing to be deliberate about is naming the scaffolding (`_PHASE_1_REAL_HANDLERS`, or whatever signals "temporary") and creating the cleanup task at the same time you add the scaffolding, not after migration is "done." Strangler scaffolding has a finite lifetime; treat it as such or it becomes architecture.
+
 ---
 
 ## 2. Trusting prompt context for stale state
@@ -142,6 +144,24 @@ Each anti-pattern has a name, the symptom you'll see, the root cause, and the fi
 **Cause**: No retention policy. Every save adds; nothing prunes.
 
 **Fix**: Set a retention policy (e.g., 365 days OR top 500 per user) and run a daily background job to prune. (Chapter 10.)
+
+---
+
+## 13. Side effects with no clear owner
+
+**Symptom**: A structured side effect — a notification, a Slack post, an SSE event, a webhook fire — starts happening from the wrong place, or stops happening when you expected it to. When you go looking for who emits it, you find two or three handlers all capable of producing it. Debugging "why did this event fire?" turns into a full grep through the codebase.
+
+**Cause**: The side effect was added inside a handler at some point and nobody wrote down who owns it. A second handler later acquired the same logic by copy-paste or by "this case also needs to fire that event." Now the gate is implicit handler logic rather than the explicit intent that should have decided it. You can't reason about when the event fires without reading every handler.
+
+**Fix**: Every structured side effect has exactly one originating handler. Maintain a side-effect ledger alongside your handler definitions:
+
+| Event | Originating handler | Purpose |
+|---|---|---|
+| `slots_available` | `book_meeting` | UI slot picker |
+| `meeting_booked` | `book_meeting` | Confirmation toast |
+| `payment_failed` | `process_payment` | Retry UI |
+
+Then write a meta-test that greps the handler source for each event name. Exactly one match expected. If two handlers emit the same event, the test fails and you have to consolidate or rename — both are fine, but the ambiguity is not. The discipline forces you to make side-effect ownership a design decision instead of an emergent property of which handler the maintainer happened to edit. When something breaks, you look at the ledger; you don't reverse-engineer it. (Chapter 14, 23.)
 
 ---
 

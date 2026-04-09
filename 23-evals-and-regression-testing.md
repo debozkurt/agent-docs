@@ -36,6 +36,31 @@ Two rules:
 
 Aim for 30 cases before you ship the first version, 100 before you trust the suite, and growing forever after that.
 
+## Routers: write the table before the prompt
+
+Routers (Chapter 14) are a special case where the eval discipline inverts: **the table comes before the implementation**. A router that picks one of N intents is the easiest thing in an agent system to test rigorously, and the test table doubles as the spec. Write it first.
+
+```python
+ROUTER_CASES = [
+    ("find me 3 bed homes in Dallas",       {"page": "search"},  "LISTING_SEARCH"),
+    ("what's on my todo list?",             {"page": "myhome"},  "HOME_CHECK"),
+    ("the 3pm one",                         {"sticky": "slots"}, "SHOWING_BOOK"),
+    ("can I afford a 500k home?",           {},                  "BUYER_FINANCE"),
+    # ... one row per behavior the router must get right
+]
+```
+
+Run the table against the real LLM, not a mock. The whole point is to test the prompt-classifier combination as it will run in production — a mocked router can't catch a prompt regression. The table then becomes the regression suite for any future prompt change: every prod misclassification gets a new row added *before* the prompt is touched, which keeps the loop honest.
+
+Two disciplines that make this work:
+
+- **Coverage requirements enforced at collection time.** A meta-test asserts every intent has a minimum number of rows (3 is a sensible floor). A new intent without rows is a build failure, not something to notice in code review.
+- **Anti-examples for the closest neighbor.** Every intent gets at least one "this looks like X but is actually Y" row. Disambiguation is where routers fail in production, and these are the rows that catch it. If you can't write a clean anti-example, your two intents probably need to merge.
+
+Cost is trivial — 100 rows × roughly $0.0001 per row on a cheap-tier model is a penny per run. Gate the table behind an env var so local development doesn't burn credits, but run it in CI before every prompt change. The router prompt is the most-edited prompt in most agent systems; it deserves the strongest test coverage.
+
+The same discipline works for any classifier-shaped eval — guardrail input checks, intent detection inside a sub-agent, content-type tagging. If the answer space is finite and labelable, write the table first.
+
 ## Grading: the three options
 
 Once you've run the agent against a case, how do you know if it passed?
