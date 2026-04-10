@@ -274,11 +274,22 @@ chat_agent   = Agent(tools=[])  <span class="dim"># no tools = just text respons
 
 <!-- ====== 9: SECTION — STATE ====== -->
 <div class="slide section-slide">
-  <h2>State &amp; Memory</h2>
-  <p style="font-size:1.3rem">Where does truth live?<br>Get this wrong and everything else breaks.</p>
+  <h2>State</h2>
+  <p style="font-size:1.3rem">What does the system remember — and for how long?</p>
 </div>
 
-<!-- ====== 10: STATELESS ====== -->
+<!-- ====== 10: WHAT IS STATE ====== -->
+<div class="slide">
+  <h2>What is <span class="accent">state</span>?</h2>
+  <p class="big">In web apps, "state" is React state or a session cookie. In agents, it's simpler:</p>
+  <p class="big" style="margin-top:1.5rem"><strong>State is what the system remembers — and for how long.</strong></p>
+  <p class="big" style="margin-top:1.5rem">Every piece of information your agent works with has a <strong>lifetime</strong>. Some things live for one turn, some for one session, some forever. The LLM itself stores nothing — it starts from zero on every call. <em>You</em> decide what to send it each time.</p>
+  <div class="insight">
+    "State management" sounds complex but it's really just answering: <strong>where does this data live, how long does it last, and who can see it?</strong>
+  </div>
+</div>
+
+<!-- ====== 10b: STATELESS ====== -->
 <div class="slide">
   <h2>The LLM is <span class="accent">stateless</span></h2>
   <p class="big">It has no memory between calls. Every call sends the <strong>entire conversation</strong> as a list of messages. Same concept across all providers.</p>
@@ -338,29 +349,32 @@ model.invoke(messages)</pre>
   <div class="cue">worked-example.md → agent.py: show messages = [SystemMessage, HumanMessage] in run_turn — this is the list</div>
 </div>
 
-<!-- ====== 11: THREE BUCKETS ====== -->
+<!-- ====== 11: THREE LIFETIMES ====== -->
 <div class="slide" style="align-items:center;">
-  <h2 style="text-align:center">Three buckets of state</h2>
+  <h2 style="text-align:center">Three lifetimes</h2>
   <div class="svg-diagram">
-    <svg viewBox="0 0 900 180" xmlns="http://www.w3.org/2000/svg" style="max-width:58rem;">
-      <rect x="10" y="20" width="270" height="140" rx="12" fill="#1e1e2e" stroke="#888" stroke-width="2"/>
-      <text x="145" y="70" text-anchor="middle" fill="#fff" font-family="Inter" font-size="22" font-weight="700">Conversation</text>
-      <text x="145" y="100" text-anchor="middle" fill="#8a87a0" font-family="Inter" font-size="15">The message list</text>
-      <text x="145" y="122" text-anchor="middle" fill="#8a87a0" font-family="Inter" font-size="15">Dies when session ends</text>
-      <rect x="315" y="20" width="270" height="140" rx="12" fill="#1e1e2e" stroke="#888" stroke-width="2"/>
-      <text x="450" y="70" text-anchor="middle" fill="#fff" font-family="Inter" font-size="22" font-weight="700">Session</text>
-      <text x="450" y="100" text-anchor="middle" fill="#8a87a0" font-family="Inter" font-size="15">User ID, settings, temp caches</text>
-      <text x="450" y="122" text-anchor="middle" fill="#8a87a0" font-family="Inter" font-size="15">Dies when turn ends</text>
-      <rect x="620" y="20" width="270" height="140" rx="12" fill="#1e1e2e" stroke="#d4a053" stroke-width="2"/>
-      <text x="755" y="70" text-anchor="middle" fill="#fff" font-family="Inter" font-size="22" font-weight="700">Database</text>
-      <text x="755" y="100" text-anchor="middle" fill="#8a87a0" font-family="Inter" font-size="15">Source of truth</text>
-      <text x="755" y="122" text-anchor="middle" fill="#d4a053" font-family="Inter" font-size="15" font-weight="600">Survives everything</text>
+    <svg viewBox="0 0 900 200" xmlns="http://www.w3.org/2000/svg" style="max-width:58rem;">
+      <rect x="10" y="20" width="270" height="160" rx="12" fill="#1e1e2e" stroke="#888" stroke-width="2"/>
+      <text x="145" y="60" text-anchor="middle" fill="#fff" font-family="Inter" font-size="22" font-weight="700">Conversation</text>
+      <text x="145" y="88" text-anchor="middle" fill="#8a87a0" font-family="Inter" font-size="14">The message list</text>
+      <text x="145" y="110" text-anchor="middle" fill="#8a87a0" font-family="Inter" font-size="14">The LLM sees this directly</text>
+      <text x="145" y="150" text-anchor="middle" fill="#888" font-family="JetBrains Mono" font-size="13">lifetime: session</text>
+      <rect x="315" y="20" width="270" height="160" rx="12" fill="#1e1e2e" stroke="#888" stroke-width="2"/>
+      <text x="450" y="60" text-anchor="middle" fill="#fff" font-family="Inter" font-size="22" font-weight="700">Session</text>
+      <text x="450" y="88" text-anchor="middle" fill="#8a87a0" font-family="Inter" font-size="14">User ID, caches, config</text>
+      <text x="450" y="110" text-anchor="middle" fill="#8a87a0" font-family="Inter" font-size="14">Flows through code, LLM can't see it</text>
+      <text x="450" y="150" text-anchor="middle" fill="#888" font-family="JetBrains Mono" font-size="13">lifetime: one turn</text>
+      <rect x="620" y="20" width="270" height="160" rx="12" fill="#1e1e2e" stroke="#d4a053" stroke-width="2"/>
+      <text x="755" y="60" text-anchor="middle" fill="#fff" font-family="Inter" font-size="22" font-weight="700">Database</text>
+      <text x="755" y="88" text-anchor="middle" fill="#8a87a0" font-family="Inter" font-size="14">Todos, users, real data</text>
+      <text x="755" y="110" text-anchor="middle" fill="#8a87a0" font-family="Inter" font-size="14">Tools read/write it, LLM doesn't touch it</text>
+      <text x="755" y="150" text-anchor="middle" fill="#d4a053" font-family="JetBrains Mono" font-size="13">lifetime: forever</text>
     </svg>
   </div>
   <div class="insight">
-    The database is the source of truth — not the conversation. Tools are <em>clients</em> of the database. A UI could write to the same tables without going through the agent.
+    The database is the source of truth. The conversation is a window into it. The session carries auth and caches. <strong>Each has a different lifetime — mix them up and things break.</strong>
   </div>
-  <div class="cue">worked-example.md → db.py: show the header comment + the Todo model — this is the source of truth</div>
+  <div class="cue">worked-example.md → run with --debug to see all three: STATE:CONVERSATION, STATE:SESSION, STATE:PERSISTENT</div>
 </div>
 
 <!-- ====== 12: THE TRAP ====== -->
