@@ -1,0 +1,2351 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI for Builders: A Crash Course — Derrick Bozkurt</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg-primary: #08090e;
+    --bg-secondary: #0e1018;
+    --bg-card: #131520;
+    --accent: #818cf8;
+    --accent-dim: #6e7af0;
+    --accent-glow: rgba(129, 140, 248, 0.10);
+    --accent-bright: #a5b4fc;
+    --cyan: #60a5fa;
+    --cyan-dim: #4e8fdc;
+    --cyan-glow: rgba(96, 165, 250, 0.08);
+    --warn: #c084fc;
+    --warn-glow: rgba(192, 132, 252, 0.08);
+    --green: #4ade80;
+    --red: #f87171;
+    --text-primary: #eef0f6;
+    --text-secondary: #b0b8d1;
+    --text-muted: #7a829e;
+    --border: rgba(129, 140, 248, 0.10);
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'Inter', -apple-system, sans-serif;
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    overflow: hidden;
+    height: 100vh;
+    width: 100vw;
+  }
+
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(129,140,248,0.008) 2px, rgba(129,140,248,0.008) 4px);
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .deck { position: relative; width: 100vw; height: 100vh; z-index: 1; }
+
+  .slide {
+    position: absolute; inset: 0;
+    display: flex; flex-direction: column; justify-content: safe center; align-items: center;
+    padding: 32px 60px 56px;
+    opacity: 0; transform: translateY(30px);
+    transition: opacity 0.6s cubic-bezier(0.4,0,0.2,1), transform 0.6s cubic-bezier(0.4,0,0.2,1);
+    pointer-events: none; overflow-y: auto;
+  }
+  .slide.active { opacity: 1; transform: translateY(0); pointer-events: all; }
+  .slide.exit-up { opacity: 0; transform: translateY(-30px); }
+
+  .slide::before {
+    content: ''; position: absolute; top: -40%; left: -30%; width: 160%; height: 160%;
+    background: radial-gradient(circle at 25% 35%, rgba(129,140,248,0.025) 0%, transparent 50%),
+                radial-gradient(circle at 75% 65%, rgba(96,165,250,0.015) 0%, transparent 50%);
+    pointer-events: none; z-index: -1;
+  }
+
+  .slide > * { position: relative; }
+
+  .animate-in.animate-done { animation: none !important; opacity: 1 !important; transform: translateY(0) !important; }
+  .animate-in.animate-done:has(:hover) { z-index: 50 !important; }
+  .cards > .card:hover, .do-dont > .do-col:hover, .do-dont > .dont-col:hover { z-index: 100 !important; position: relative; }
+
+  /* Typography */
+  h1 { font-size: 3.5rem; font-weight: 800; line-height: 1.15; letter-spacing: -0.03em; margin-bottom: 20px; max-width: 900px; text-align: center; }
+  h2 { font-size: 2.5rem; font-weight: 700; line-height: 1.2; letter-spacing: -0.02em; margin-bottom: 32px; text-align: center; }
+  h3 { font-size: 1.4rem; font-weight: 600; margin-bottom: 14px; }
+  .subtitle { font-size: 1.25rem; color: var(--text-secondary); font-weight: 400; max-width: 720px; text-align: center; line-height: 1.6; }
+  .glow-text { color: var(--accent); text-shadow: 0 0 20px rgba(129,140,248,0.25); }
+  .cyan-text { color: var(--cyan); text-shadow: 0 0 20px rgba(96,165,250,0.25); }
+  .section-label { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.15em; color: var(--accent); font-weight: 600; margin-bottom: 12px; font-family: 'JetBrains Mono', monospace; }
+  .divider { width: 60px; height: 3px; background: linear-gradient(90deg, var(--accent), var(--cyan)); border-radius: 2px; margin: 20px auto; box-shadow: 0 0 10px rgba(129,140,248,0.2); }
+
+  /* Cards */
+  .cards { display: grid; gap: 18px; width: 100%; max-width: 1100px; }
+  .cards-2 { grid-template-columns: 1fr 1fr; align-items: stretch; }
+  .cards-3 { grid-template-columns: 1fr 1fr 1fr; }
+  .card {
+    background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; padding: 26px;
+    transition: transform 0.3s ease, border-color 0.3s ease, background 0.3s ease, box-shadow 0.3s ease;
+  }
+  .card { cursor: pointer; }
+  .card:hover { transform: scale(1.03); }
+  .card.expand-source { border-color: rgba(129,140,248,0.5); box-shadow: 0 0 20px rgba(129,140,248,0.15); }
+  .card h3 { font-size: 1.1rem; margin-bottom: 12px; font-weight: 600; color: var(--accent); }
+  .card p, .card li { color: var(--text-secondary); font-size: 1rem; line-height: 1.65; }
+  .card ul { list-style: none; padding: 0; }
+  .card ul li { padding: 4px 0 4px 18px; position: relative; }
+  .card ul li::before { content: ''; position: absolute; left: 0; top: 12px; width: 6px; height: 6px; border-radius: 50%; background: var(--accent); opacity: 0.7; }
+
+  /* Warn card */
+  .card-warn { background: rgba(192,132,252,0.04); border-color: rgba(192,132,252,0.12); }
+  .card-warn h3 { color: var(--warn) !important; }
+  .card-warn ul li::before { background: var(--warn); }
+  .card-warn:hover { background: #1e1730; border-color: rgba(192,132,252,0.3); box-shadow: 0 12px 48px rgba(0,0,0,0.7), 0 0 0 1px rgba(192,132,252,0.2); }
+
+  /* Quote block */
+  .quote-block {
+    border-left: 3px solid var(--accent); padding: 18px 26px; background: var(--accent-glow);
+    border-radius: 0 10px 10px 0; max-width: 800px; margin: 16px 0;
+    transition: transform 0.3s ease, background 0.3s ease, box-shadow 0.3s ease;
+  }
+  .quote-block { cursor: pointer; }
+  .quote-block:hover { transform: scale(1.03); }
+  .quote-block.expand-source { border-color: rgba(129,140,248,0.4); box-shadow: 0 0 20px rgba(129,140,248,0.1); }
+  .quote-block p { font-size: 1.15rem; font-style: italic; color: var(--text-primary); line-height: 1.6; }
+
+  /* Highlight box */
+  .highlight-box {
+    background: linear-gradient(135deg, rgba(129,140,248,0.07), rgba(96,165,250,0.05));
+    border: 1px solid rgba(129,140,248,0.15); border-radius: 14px; padding: 28px 40px;
+    text-align: center; margin-top: 18px; max-width: 700px;
+    transition: transform 0.3s ease, background 0.3s ease, box-shadow 0.3s ease;
+  }
+  .highlight-box { cursor: pointer; }
+  .highlight-box:hover { transform: scale(1.03); }
+  .highlight-box.expand-source { border-color: rgba(129,140,248,0.4); box-shadow: 0 0 20px rgba(129,140,248,0.1); }
+  .highlight-box h3 { color: var(--accent); font-size: 1.4rem; margin-bottom: 6px; }
+  .highlight-box p { color: var(--text-primary); font-size: 1.05rem; line-height: 1.65; }
+
+  /* Tags */
+  .tags { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; margin-top: 14px; }
+  .tag { padding: 7px 16px; border-radius: 100px; font-size: 0.88rem; font-weight: 500; background: var(--accent-glow); color: var(--accent-bright); border: 1px solid rgba(129,140,248,0.15); font-family: 'JetBrains Mono', monospace; transition: transform 0.2s ease, background 0.2s ease; }
+  .tag:hover { transform: translateY(-1px); background: rgba(129,140,248,0.18); }
+  .tag.cyan { background: var(--cyan-glow); color: var(--cyan); border-color: rgba(96,165,250,0.15); }
+
+  /* Speaker info */
+  .speaker-info { display: flex; align-items: center; gap: 16px; margin-top: 28px; padding: 12px 22px; background: var(--bg-card); border-radius: 10px; border: 1px solid var(--border); }
+  .speaker-info .speaker-name { font-weight: 600; font-size: 1.05rem; color: var(--accent); }
+  .speaker-info .speaker-role { color: var(--text-secondary); font-size: 0.85rem; }
+
+  /* ============ ANIMATED FLOW ============ */
+  .flow {
+    display: flex; align-items: center; gap: 0; width: 100%; max-width: 1050px;
+    justify-content: center; margin: 20px 0;
+  }
+  .flow-step {
+    background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px;
+    padding: 18px 20px; text-align: center; min-width: 140px; flex-shrink: 0;
+    opacity: 0; transform: translateY(16px);
+    transition: transform 0.3s ease, background 0.3s ease, box-shadow 0.3s ease, border-color 0.3s ease;
+  }
+  .flow-step:hover {
+    transform: scale(1.2) !important; background: #1a1f35;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.6), 0 0 0 1px rgba(129,140,248,0.2);
+    border-color: rgba(129,140,248,0.4); z-index: 100; position: relative;
+  }
+  .flow-step h4 { font-size: 0.9rem; color: var(--accent); margin-bottom: 6px; font-family: 'JetBrains Mono', monospace; text-transform: uppercase; letter-spacing: 0.05em; }
+  .flow-step p { font-size: 0.88rem; color: var(--text-primary); line-height: 1.45; }
+  .flow-arrow {
+    color: var(--accent); font-size: 1.2rem; padding: 0 6px; flex-shrink: 0;
+    opacity: 0; font-family: 'JetBrains Mono', monospace;
+  }
+
+  .slide.active .flow-step { animation: flowIn 0.5s ease both; animation-delay: var(--d, 0s); }
+  .slide.active .flow-arrow { animation: flowIn 0.3s ease both; animation-delay: var(--d, 0s); }
+
+  @keyframes flowIn { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: translateY(0); } }
+
+  /* ============ CODE BLOCK ============ */
+  .code-block {
+    background: #0d0f1a; border: 1px solid rgba(129,140,248,0.08); border-radius: 10px;
+    padding: 22px 28px; font-family: 'JetBrains Mono', monospace; font-size: 0.9rem;
+    line-height: 1.7; color: var(--text-primary); overflow-x: auto; max-width: 800px;
+    width: 100%; white-space: pre; margin: 14px 0;
+    transition: transform 0.3s ease, box-shadow 0.3s ease, background 0.3s ease;
+  }
+  .code-block { cursor: pointer; }
+  .code-block:hover { transform: scale(1.03); }
+  .code-block.expand-source { border-color: rgba(129,140,248,0.3); box-shadow: 0 0 20px rgba(129,140,248,0.1); }
+  .ck { color: #c084fc; } /* keyword */
+  .cs { color: #86efac; } /* string */
+  .cp { color: #818cf8; } /* param/key */
+  .cc { color: #6b7394; } /* comment */
+  .cn { color: #fbbf24; } /* number */
+  .cf { color: #60a5fa; } /* function */
+
+  /* ============ COMPARISON (before/after) ============ */
+  .comparison { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; width: 100%; max-width: 1000px; }
+  .comp-card {
+    background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; padding: 24px;
+    transition: transform 0.3s ease, background 0.3s ease, box-shadow 0.3s ease;
+  }
+  .comp-card { cursor: pointer; }
+  .comp-card:hover { transform: scale(1.03); }
+  .comp-card.expand-source { border-color: rgba(129,140,248,0.5); box-shadow: 0 0 20px rgba(129,140,248,0.15); }
+  .comp-label { font-size: 0.82rem; text-transform: uppercase; letter-spacing: 0.1em; font-family: 'JetBrains Mono', monospace; margin-bottom: 12px; font-weight: 600; }
+  .comp-bad .comp-label { color: var(--red); }
+  .comp-good .comp-label { color: var(--green); }
+  .comp-bad { border-color: rgba(248,113,113,0.15); }
+  .comp-good { border-color: rgba(74,222,128,0.15); }
+  .comp-card pre { font-family: 'JetBrains Mono', monospace; font-size: 0.88rem; color: var(--text-primary); line-height: 1.6; white-space: pre-wrap; }
+  .comp-card .comp-output { margin-top: 14px; padding-top: 14px; border-top: 1px solid rgba(255,255,255,0.08); font-family: 'Inter', sans-serif; font-size: 0.95rem; color: var(--text-secondary); font-style: italic; }
+
+  /* ============ SCATTER PLOT (embeddings) ============ */
+  .scatter {
+    position: relative; width: min(70vh, 700px); height: min(45vh, 400px);
+    background: rgba(129,140,248,0.03); border: 1px solid var(--border); border-radius: 12px;
+    margin: 8px 0; overflow: visible;
+  }
+  .scatter-dot {
+    position: absolute; display: flex; align-items: center; gap: 8px;
+    transition: transform 0.3s ease;
+  }
+  .scatter-dot:hover { transform: scale(1.3); z-index: 10; }
+  .scatter-dot .dot { width: 12px; height: 12px; border-radius: 50%; flex-shrink: 0; box-shadow: 0 0 8px currentColor; }
+  .scatter-dot span:not(.dot) { font-size: 0.72rem; color: var(--text-secondary); font-family: 'JetBrains Mono', monospace; white-space: nowrap; }
+
+  /* ============ SPECTRUM (memory) ============ */
+  .spectrum { display: flex; width: 100%; max-width: 900px; margin: 20px 0; gap: 0; position: relative; }
+  .spectrum::before {
+    content: ''; position: absolute; top: 7px; left: 2%; right: 2%; height: 3px;
+    background: linear-gradient(90deg, var(--green), var(--accent), var(--cyan), var(--warn));
+    border-radius: 2px; z-index: 0;
+  }
+  .spectrum-item {
+    flex: 1; text-align: center; position: relative; z-index: 1; padding: 0 8px;
+    transition: transform 0.3s ease;
+  }
+  .spectrum-item:hover { transform: scale(1.15); }
+
+  .memory-panel { display: none; }
+  .memory-panel.active { display: block; animation: fadeSlideIn 0.3s ease; }
+
+  /* Global click-to-expand system */
+  .expand-scrim {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.95);
+    z-index: 9000; opacity: 0; pointer-events: none;
+    transition: opacity 0.4s ease;
+  }
+  .expand-scrim.active { opacity: 1; pointer-events: auto; }
+
+  .expanded-clone {
+    position: fixed !important; left: 50% !important; top: 50% !important;
+    transform: translate(-50%, -50%) scale(0.5) !important;
+    z-index: 9100 !important; opacity: 0; pointer-events: none;
+    max-width: 90vw; max-height: 88vh; overflow: auto;
+    width: auto; margin: 0 !important;
+    transition: transform 0.5s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.35s ease;
+    box-shadow: 0 0 60px rgba(129,140,248,0.15), 0 24px 80px rgba(0,0,0,0.8) !important;
+    border: 1px solid rgba(129,140,248,0.2) !important;
+    background: #0d0f1a !important;
+  }
+  .expanded-clone.active {
+    transform: translate(-50%, -50%) scale(1) !important; opacity: 1; pointer-events: auto;
+  }
+  .expanded-clone:hover { background: #0d0f1a !important; transform: translate(-50%, -50%) scale(1) !important; }
+  .expanded-clone.code-block {
+    font-size: 0.9rem !important; padding: 28px 32px !important;
+    min-width: min(60vw, 800px); max-width: 85vw; max-height: 80vh;
+    overflow: auto; line-height: 1.7 !important;
+  }
+  .expanded-clone.card, .expanded-clone.comp-card {
+    font-size: 1rem; padding: 28px 32px !important;
+    min-width: min(50vw, 700px); max-width: 80vw; max-height: 80vh;
+    overflow: auto;
+  }
+  .expanded-clone.card h3, .expanded-clone.comp-card h3 { font-size: 1.3rem !important; }
+  .expanded-clone.card p, .expanded-clone.comp-card p { font-size: 1.05rem !important; line-height: 1.6; }
+  .expanded-clone.card li, .expanded-clone.comp-card li { font-size: 1.05rem !important; line-height: 1.6; }
+  .expanded-clone .code-block { font-size: 0.95rem !important; }
+  .expanded-clone.comp-card pre { font-size: 0.95rem !important; }
+
+  /* Attention trigger (special case — opens custom overlay, not clone) */
+  .attention-trigger { cursor: pointer; position: relative; z-index: 10; border-color: rgba(96,165,250,0.3) !important; }
+  .attention-trigger:hover { box-shadow: 0 0 20px rgba(96,165,250,0.3); }
+
+  .attention-overlay {
+    position: fixed; left: 50%; top: 50%;
+    transform: translate(-50%, -50%) scale(0.3); transform-origin: center;
+    width: 85%; max-width: 700px;
+    background: #0d0f1a; border: 1px solid rgba(96,165,250,0.3);
+    border-radius: 14px; padding: 32px 36px;
+    opacity: 0; pointer-events: none; z-index: 9100;
+    transition: transform 0.5s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.35s ease;
+    box-shadow: 0 0 60px rgba(96,165,250,0.15), 0 24px 80px rgba(0,0,0,0.7);
+  }
+  .attention-overlay::before {
+    content: ''; position: absolute; inset: -1px; border-radius: 14px;
+    background: linear-gradient(135deg, rgba(96,165,250,0.25), transparent 40%, rgba(96,165,250,0.1));
+    z-index: -1; pointer-events: none;
+  }
+  .attention-overlay.active {
+    transform: translate(-50%, -50%) scale(1); opacity: 1; pointer-events: auto;
+  }
+  .spectrum-dot { width: 14px; height: 14px; border-radius: 50%; margin: 0 auto 10px; box-shadow: 0 0 12px currentColor; }
+  .spectrum-item h4 { font-size: 0.9rem; color: var(--text-primary); margin-bottom: 4px; font-weight: 600; }
+  .spectrum-item p { font-size: 0.8rem; color: var(--text-secondary); line-height: 1.5; }
+
+  /* ============ DECISION TREE ============ */
+  .tree { display: flex; flex-direction: column; align-items: center; gap: 0; margin: 16px 0; width: 100%; max-width: 800px; }
+  .tree-question {
+    background: var(--bg-card); border: 1px solid var(--border); border-radius: 10px;
+    padding: 14px 24px; text-align: center; font-size: 1rem; color: var(--text-primary);
+    font-weight: 600; margin-bottom: 0; width: fit-content;
+    transition: transform 0.3s ease, background 0.3s ease, box-shadow 0.3s ease;
+  }
+  .tree-question { cursor: pointer; }
+  .tree-question:hover { transform: scale(1.03); }
+  .tree-connector { width: 2px; height: 18px; background: rgba(129,140,248,0.2); }
+  .tree-branches { display: flex; gap: 24px; justify-content: center; flex-wrap: wrap; }
+  .tree-branch {
+    background: var(--bg-card); border: 1px solid var(--border); border-radius: 10px;
+    padding: 14px 20px; text-align: center; min-width: 160px;
+    transition: transform 0.3s ease, background 0.3s ease, box-shadow 0.3s ease;
+  }
+  .tree-branch { cursor: pointer; }
+  .tree-branch:hover { transform: scale(1.03); }
+  .tree-branch h4 { font-size: 0.9rem; color: var(--accent-bright); margin-bottom: 4px; font-family: 'JetBrains Mono', monospace; }
+  .tree-branch p { font-size: 0.88rem; color: var(--text-primary); }
+  .tree-row { display: flex; flex-direction: column; align-items: center; }
+
+  /* ============ STAT BOXES ============ */
+  .stats { display: flex; gap: 32px; margin: 16px 0; justify-content: center; flex-wrap: wrap; }
+  .stat { text-align: center; padding: 16px 24px; background: var(--bg-card); border: 1px solid var(--border); border-radius: 10px; min-width: 120px; transition: transform 0.3s ease, background 0.3s ease, box-shadow 0.3s ease; }
+  .stat { cursor: pointer; }
+  .stat:hover { transform: scale(1.03); }
+  .stat.expand-source { border-color: rgba(129,140,248,0.4); box-shadow: 0 0 16px rgba(129,140,248,0.1); }
+  .stat .num { font-size: 1.6rem; font-weight: 800; color: var(--accent); font-family: 'JetBrains Mono', monospace; }
+  .stat .label { font-size: 0.88rem; color: var(--text-secondary); margin-top: 4px; }
+
+  /* Chat bubble (hallucination demo) */
+  .chat { max-width: 700px; width: 100%; margin: 14px 0; }
+  .chat-msg {
+    padding: 14px 20px; border-radius: 12px; margin-bottom: 10px; font-size: 0.95rem; line-height: 1.5;
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+  }
+  .chat-msg { cursor: pointer; }
+  .chat-msg:hover { transform: scale(1.03); }
+  .chat-user { background: rgba(96,165,250,0.08); border: 1px solid rgba(96,165,250,0.15); color: var(--text-primary); }
+  .chat-ai { background: rgba(129,140,248,0.06); border: 1px solid rgba(129,140,248,0.12); color: var(--text-primary); }
+  .chat-label { font-size: 0.75rem; font-family: 'JetBrains Mono', monospace; text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 6px; }
+  .chat-user .chat-label { color: var(--cyan); }
+  .chat-ai .chat-label { color: var(--accent); }
+  .chat-warning { font-size: 0.88rem; color: var(--red); font-style: italic; margin-top: 8px; }
+
+  /* Step list */
+  .step-list { list-style: none; padding: 0; width: 100%; max-width: 850px; }
+  .step-list li { display: flex; align-items: flex-start; gap: 18px; padding: 14px 12px; margin: 0 -12px; border-bottom: 1px solid rgba(129,140,248,0.05); border-radius: 8px; font-size: 1.05rem; line-height: 1.55; color: var(--text-secondary); transition: transform 0.3s ease, background 0.3s ease, box-shadow 0.3s ease; }
+  .step-list li:hover { transform: scale(1.2); background: #1a1f35; box-shadow: 0 12px 48px rgba(0,0,0,0.7), 0 0 0 1px rgba(129,140,248,0.2); border-color: transparent; z-index: 100; position: relative; }
+  .step-list li:last-child { border-bottom: none; }
+  .step-num { flex-shrink: 0; width: 34px; height: 34px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 0.85rem; font-family: 'JetBrains Mono', monospace; color: var(--bg-primary); background: var(--accent); box-shadow: 0 0 12px rgba(129,140,248,0.15); }
+  .step-num.cyan { background: var(--cyan); box-shadow: 0 0 12px rgba(96,165,250,0.15); }
+
+  /* QR section */
+  .qr-section { display: flex; align-items: center; gap: 24px; margin-top: 18px; padding: 18px 24px; background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; max-width: 700px; transition: transform 0.3s ease, background 0.3s ease, box-shadow 0.3s ease; }
+  .qr-section:hover { transform: scale(1.15); background: #1a1f35; box-shadow: 0 12px 48px rgba(0,0,0,0.7); z-index: 100; position: relative; }
+  .qr-section img { width: 110px; height: 110px; border-radius: 8px; border: 2px solid rgba(129,140,248,0.12); }
+  .qr-section div h3 { color: var(--accent); font-size: 1rem; margin-bottom: 4px; }
+  .qr-section div p { color: var(--text-secondary); font-size: 0.9rem; line-height: 1.4; }
+  .qr-section code { color: var(--cyan); font-family: 'JetBrains Mono', monospace; font-size: 0.82rem; }
+
+  /* Aside */
+  .aside { font-size: 0.92rem; color: var(--text-secondary); font-style: italic; margin-top: 8px; }
+
+  /* ============ NAV ============ */
+  .nav-bar { position: fixed; bottom: 0; left: 0; right: 0; height: 50px; background: rgba(8,9,14,0.9); backdrop-filter: blur(20px); border-top: 1px solid rgba(129,140,248,0.06); display: flex; align-items: center; justify-content: space-between; padding: 0 32px; z-index: 100; }
+  .progress-track { flex: 1; height: 2px; background: rgba(255,255,255,0.06); border-radius: 2px; margin: 0 24px; overflow: hidden; }
+  .progress-fill { height: 100%; background: linear-gradient(90deg, var(--accent), var(--cyan)); border-radius: 2px; transition: width 0.5s cubic-bezier(0.4,0,0.2,1); box-shadow: 0 0 8px rgba(129,140,248,0.2); }
+  .slide-counter { font-family: 'JetBrains Mono', monospace; font-size: 0.78rem; color: var(--text-muted); min-width: 60px; }
+  .nav-btn { background: none; border: 1px solid rgba(129,140,248,0.12); color: var(--text-secondary); width: 32px; height: 32px; border-radius: 6px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.2s; font-size: 0.85rem; }
+  .nav-btn:hover { background: var(--accent-glow); border-color: rgba(129,140,248,0.3); color: var(--accent); }
+  .nav-controls { display: flex; gap: 6px; }
+  .key-hint { position: fixed; bottom: 58px; right: 32px; font-size: 0.78rem; color: var(--text-muted); font-family: 'JetBrains Mono', monospace; z-index: 100; opacity: 0.4; }
+
+  /* Animations */
+  .slide.active .animate-in { animation: fadeSlideIn 0.5s cubic-bezier(0.4,0,0.2,1) both; }
+  .animate-in:nth-child(1) { animation-delay: 0.1s; }
+  .animate-in:nth-child(2) { animation-delay: 0.2s; }
+  .animate-in:nth-child(3) { animation-delay: 0.3s; }
+  .animate-in:nth-child(4) { animation-delay: 0.4s; }
+  .animate-in:nth-child(5) { animation-delay: 0.5s; }
+  .animate-in:nth-child(6) { animation-delay: 0.55s; }
+  .animate-in:nth-child(7) { animation-delay: 0.6s; }
+  .animate-in:nth-child(8) { animation-delay: 0.65s; }
+  @keyframes fadeSlideIn { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: translateY(0); } }
+  @keyframes pulseGlow { 0%,100% { box-shadow: 0 0 16px rgba(129,140,248,0.1); } 50% { box-shadow: 0 0 32px rgba(129,140,248,0.2); } }
+  .glow { animation: pulseGlow 3s ease-in-out infinite; }
+
+  /* Laptop screens — reduce padding and sizes */
+  @media (max-height: 800px) {
+    .slide { padding: 20px 40px 44px; }
+    h1 { font-size: 2.8rem; } h2 { font-size: 2rem; margin-bottom: 20px; }
+    h3 { font-size: 1.2rem; }
+    .subtitle { font-size: 1.05rem; }
+    .card { padding: 18px; }
+    .card p, .card li { font-size: 0.9rem; }
+    .code-block { padding: 16px 20px; font-size: 0.82rem; line-height: 1.5; margin: 8px 0; }
+    .flow-step { padding: 10px 14px; }
+    .flow-step h4 { font-size: 0.8rem; }
+    .flow-step p { font-size: 0.78rem; }
+    .highlight-box { padding: 18px 28px; }
+    .quote-block { padding: 14px 20px; }
+    .quote-block p { font-size: 1rem; }
+    .scatter { width: min(65vh, 600px); height: min(35vh, 320px); }
+    .stat { padding: 10px 16px; min-width: 100px; }
+    .stat .num { font-size: 1.3rem; }
+    .chat-msg { padding: 10px 16px; font-size: 0.88rem; }
+    .comparison { gap: 14px; }
+    .comp-card { padding: 18px; }
+    .attention-overlay { padding: 24px 28px; }
+    .attention-overlay h3 { font-size: 1rem; }
+    .attention-overlay p { font-size: 0.88rem; }
+    .attention-overlay div[style*="JetBrains"] { font-size: 0.82rem; }
+  }
+
+  /* Narrow / tablet screens */
+  @media (max-width: 900px) {
+    .slide { padding: 24px 20px 50px; }
+    h1 { font-size: 2.2rem; } h2 { font-size: 1.8rem; }
+    .cards-2, .cards-3, .comparison, .do-dont { grid-template-columns: 1fr; }
+    .flow { flex-direction: column; }
+    .flow-arrow { transform: rotate(90deg); }
+    .scatter { width: 90vw; height: 90vw; max-width: 400px; max-height: 400px; }
+    .spectrum { flex-direction: column; gap: 16px; }
+    .spectrum::before { display: none; }
+    .expanded-clone { max-width: 95vw !important; min-width: auto !important; }
+    .attention-overlay { width: 95%; max-width: 95vw; padding: 20px 22px; }
+  }
+  /* ============ PRESENTER MODE ============ */
+  body.presenter-mode .deck {
+    border-bottom: 2px solid rgba(129,140,248,0.2);
+    transition: height 0.25s ease;
+  }
+  body.presenter-mode .slide { padding-bottom: 24px; }
+  body.presenter-mode .nav-bar { display: none; }
+  body.presenter-mode .key-hint { display: none; }
+
+  .presenter-notes {
+    display: none;
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 45vh;
+    background: #0a0b10;
+    color: #d0d8e8;
+    overflow-y: auto;
+    z-index: 10000;
+    padding: 20px 40px 20px;
+    font-family: 'Inter', sans-serif;
+    font-size: 1.05rem;
+    line-height: 1.7;
+    border-top: none;
+    transition: height 0.25s ease;
+  }
+  body.presenter-mode .presenter-notes { display: block; }
+  .presenter-notes.collapsed { height: 42px; overflow: hidden; }
+  .presenter-notes.collapsed .notes-body { display: none; }
+
+  /* Drag handle */
+  .notes-drag-handle {
+    position: absolute;
+    top: 0; left: 0; right: 0; height: 6px;
+    cursor: ns-resize;
+    background: rgba(129,140,248,0.25);
+    transition: background 0.2s;
+  }
+  .notes-drag-handle:hover, .notes-drag-handle.dragging {
+    background: rgba(129,140,248,0.5);
+  }
+
+  /* Collapse toggle */
+  .notes-collapse-btn {
+    background: none;
+    border: 1px solid rgba(129,140,248,0.15);
+    color: var(--text-secondary);
+    padding: 2px 10px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.85rem;
+    font-family: 'JetBrains Mono', monospace;
+    margin-right: 8px;
+    transition: background 0.2s, color 0.2s;
+  }
+  .notes-collapse-btn:hover {
+    background: var(--accent-glow);
+    border-color: rgba(129,140,248,0.3);
+    color: var(--accent);
+  }
+
+  .presenter-notes .notes-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid rgba(129,140,248,0.1);
+  }
+  .presenter-notes .notes-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: var(--accent);
+    font-weight: 600;
+  }
+  .presenter-notes .notes-slide-num {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.8rem;
+    color: var(--text-muted);
+  }
+  .presenter-notes .notes-body {
+    color: #c8d0e4;
+    font-size: 1rem;
+    line-height: 1.6;
+  }
+  .notes-bullet {
+    padding: 2px 0 2px 16px;
+    text-indent: -16px;
+  }
+  .notes-star {
+    color: #fbbf24;
+    font-weight: 600;
+    padding: 6px 0 2px;
+    border-left: 3px solid #fbbf24;
+    padding-left: 12px;
+    margin: 4px 0;
+  }
+  .notes-expand {
+    color: #60a5fa;
+    padding: 2px 0 2px 16px;
+    text-indent: -16px;
+    font-size: 0.95rem;
+  }
+  .notes-cue {
+    color: #c084fc;
+    font-weight: 600;
+    font-style: italic;
+    padding: 4px 0;
+  }
+  .notes-demo {
+    color: #f87171;
+    font-weight: 700;
+    padding: 6px 0 2px;
+    border-left: 3px solid #f87171;
+    padding-left: 12px;
+    margin: 6px 0 2px;
+    font-size: 1rem;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+  }
+  .notes-nugget {
+    color: #4ade80;
+    font-weight: 600;
+    padding: 6px 0 2px;
+    border-left: 3px solid #4ade80;
+    padding-left: 12px;
+    margin: 4px 0;
+    font-size: 0.95rem;
+  }
+  .presenter-notes .notes-nav {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+  }
+  .presenter-notes .notes-nav button {
+    background: none;
+    border: 1px solid rgba(129,140,248,0.15);
+    color: var(--text-secondary);
+    padding: 4px 12px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.85rem;
+    font-family: 'JetBrains Mono', monospace;
+  }
+  .presenter-notes .notes-nav button:hover {
+    background: var(--accent-glow);
+    border-color: rgba(129,140,248,0.3);
+    color: var(--accent);
+  }
+</style>
+</head>
+<body>
+<div class="deck" id="deck">
+
+  <!-- ============ SLIDE 1: Title ============ -->
+  <div class="slide active" data-slide="0" data-notes="Hey everyone, welcome.
+
+I'm Derrick — I'll be speaking and mentoring this weekend.
+
+This is not an AI theory class.
+By the end of this talk, you'll know enough to pick the right architecture for your project and start building.
+
+If you've never touched the AI APIs — great, you're the target audience.
+If you have — stick around, the framing will still be useful.
+
+~1 min">
+    <div class="section-label animate-in">promptengineers.ai // Spring 2026 Hackathon</div>
+    <h1 class="animate-in">AI for <span class="glow-text">Builders</span></h1>
+    <p class="subtitle animate-in">A crash course in the concepts, patterns, and practical knowledge you need to build an AI-powered MVP.</p>
+    <div class="divider animate-in"></div>
+    <div class="speaker-info animate-in">
+      <div>
+        <div class="speaker-name">Derrick Bozkurt</div>
+        <div class="speaker-role">Speaker &amp; Mentor</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ SLIDE 2: What LLMs Actually Are ============ -->
+  <div class="slide" data-slide="1" data-notes="Every AI tool you've used runs this exact pipeline.
+
+Walk the flow left to right — don't dwell, just narrate:
+Chop text into tokens, each token looks at every other token, compute probabilities for the next one, pick one, append, loop.
+
+That's it. Every response you've ever gotten was built one token at a time.
+
+Now the two cards — this is the punchline:
+
+There are no stored facts inside these models.
+It SIMULATES language. It doesn't RETRIEVE truth.
+That's why it can sound confident and be completely wrong.
+
+You're not querying a database.
+You're shaping behavior through the structure of your input.
+
+💡 NUGGETS if audience is engaged:
+• Models have billions of learned parameters (weights) — Claude ~100B+, GPT-4 rumored ~1.7T. Those weights encode patterns, not facts.
+• &quot;Temperature&quot; controls randomness at the sampling step. temp=0 → always pick most likely token (deterministic). temp=1 → more creative/random. You'll use this.
+• Attention is O(n²) — every token attends to every other. That's why long contexts are expensive and slow.
+
+⤵ Click pipeline steps IF audience wants detail — otherwise skip.
+
+~3 min">
+
+    <h2 class="animate-in">What Actually Happens When You <span class="glow-text">Use AI</span></h2>
+    <p class="subtitle animate-in" style="margin-bottom: 12px;">Built on the <strong style="color: var(--text-primary);">Transformer</strong> architecture (2017).<br>Every AI tool you've used runs this pipeline:</p>
+    <div class="flow animate-in pipeline-flow" style="margin-bottom: 12px;">
+      <div class="flow-step attention-trigger" style="--d:0.3s;" onclick="togglePipeline('tokenize')"><h4>1. Tokenize</h4><p>Text &#8594; tokens &#8594; vectors</p></div>
+      <div class="flow-arrow" style="--d:0.5s">&#8594;</div>
+      <div class="flow-step attention-trigger" style="--d:0.7s;" onclick="togglePipeline('attention')"><h4>2. Attention</h4><p>Each token weighs all others</p></div>
+      <div class="flow-arrow" style="--d:0.9s">&#8594;</div>
+      <div class="flow-step attention-trigger" style="--d:1.1s;" onclick="togglePipeline('compute')"><h4>3. Compute</h4><p>Next token probabilities</p></div>
+      <div class="flow-arrow" style="--d:1.3s">&#8594;</div>
+      <div class="flow-step attention-trigger" style="--d:1.5s;" onclick="togglePipeline('sample')"><h4>4. Sample</h4><p>Pick one token, append</p></div>
+      <div class="flow-arrow" style="--d:1.7s">&#8594;</div>
+      <div class="flow-step attention-trigger" style="--d:1.9s;" onclick="togglePipeline('repeat')"><h4>5. Repeat</h4><p>Loop until done</p></div>
+    </div>
+    <div class="cards cards-2 animate-in" style="gap: 12px;">
+      <div class="card" style="padding: 14px;">
+        <h3 style="color: var(--warn);">The Reality</h3>
+        <p>No stored facts — only learned patterns</p>
+        <p>Context window = temporary memory only</p>
+        <p>Same input can give different outputs</p>
+        <p style="margin-top: 8px; font-size: 0.82rem; color: var(--warn); font-style: italic;">It simulates language, not retrieves truth.</p>
+      </div>
+      <div class="card" style="padding: 14px;">
+        <h3 style="color: var(--green);">For Builders</h3>
+        <p>Plausible &#8800; correct (hallucination)</p>
+        <p>Small prompt changes &#8594; big output shifts</p>
+        <p>You shape behavior through structure</p>
+        <p style="margin-top: 8px; font-size: 0.82rem; color: var(--green); font-style: italic;">You're programming behavior, not querying knowledge.</p>
+      </div>
+    </div>
+    <p class="aside animate-in" style="text-align: center; margin-top: 10px;">LLMs are stateless — memory must be built around them.</p>
+  </div>
+
+  <!-- ============ SLIDE 4: The Context Window ============ -->
+  <div class="slide" data-slide="2" data-notes="Think of it like a desk.
+You can only spread so many papers on it.
+The model can ONLY see what's on the desk — nothing else exists.
+
+Point to the numbers — these are how big the desk is for each model.
+
+💡 NUGGET: Bigger context ≠ free.
+Models get worse at finding info buried in the middle of long contexts — &quot;lost in the middle&quot; problem. Just because Gemini has 1M tokens doesn't mean you should use all of them. Shorter, focused context almost always wins.
+
+★ Now the highlight box — this is the thesis of the talk:
+
+Every single pattern we're about to learn — RAG, memory, tools — is just a strategy for deciding what goes on this desk.
+
+That's it. That's the whole game.
+
+~1 min">
+    <h2 class="animate-in">The <span class="glow-text">Context Window</span></h2>
+    <p class="subtitle animate-in">Think of it as a desk.<br>You can only have so many papers on it at once.<br>The model can only see what's on the desk.</p>
+    <div class="stats animate-in">
+      <div class="stat"><div class="num">200K</div><div class="label">Claude</div></div>
+      <div class="stat"><div class="num">128K</div><div class="label">GPT-4o</div></div>
+      <div class="stat"><div class="num">1M+</div><div class="label">Gemini</div></div>
+      <div class="stat"><div class="num">~750</div><div class="label">Words / 1K tokens</div></div>
+    </div>
+    <div class="highlight-box animate-in">
+      <h3>The Unifying Insight</h3>
+      <p>Every architecture pattern we'll learn today — RAG, memory, tool use — exists to manage what goes on this desk. That's the whole game.</p>
+    </div>
+  </div>
+
+  <!-- ============ SLIDE 5: Tokenization & Cost ============ -->
+  <div class="slide" data-slide="3" data-notes="Quick practical point — tokens are the currency.
+
+You pay per token. Your context window is measured in tokens. And tokens are NOT words — that sentence up there is 7 tokens, not 5 words.
+
+💡 NUGGET: Tokenizers use an algorithm called BPE — Byte Pair Encoding. It learns common character sequences from training data. That's why &quot;ing&quot; or &quot;tion&quot; are single tokens but rare words get split into pieces. Each model has its own tokenizer — same text = different token count across models.
+
+⤵ Expand right card if you want to emphasize: cost, limits, speed, multilingual penalty.
+
+★ But here's what I really want you to hear — the highlight box:
+
+100 API calls costs about thirty cents.
+Your entire hackathon will cost less than lunch.
+Do NOT let cost anxiety slow you down.
+
+~1 min">
+    <h2 class="animate-in">Tokenization: <span class="cyan-text">The Currency of AI</span></h2>
+    <div class="cards cards-2 animate-in">
+      <div class="card">
+        <h3>How Text Becomes Tokens</h3>
+        <pre class="code-block" style="margin: 0; font-size: 0.85rem;"><span class="cc">// A token is NOT a word. It can be:</span>
+<span class="cc">// - a whole word    - part of a word</span>
+<span class="cc">// - punctuation     - a space + word</span>
+
+<span class="cc">// "Tokenization is surprisingly tricky!"</span>
+[<span class="cs">"Token"</span>, <span class="cs">"ization"</span>, <span class="cs">" is"</span>,
+ <span class="cs">" surprising"</span>, <span class="cs">"ly"</span>,
+ <span class="cs">" tricky"</span>, <span class="cs">"!"</span>]  <span class="cc">// 7 tokens</span>
+
+<span class="cc">// Common suffixes (-ing, -tion, -ly) = 1 token</span>
+<span class="cc">// Rare words get split into pieces:</span>
+<span class="cs">"ChatGPT"</span>  → [<span class="cs">"Chat"</span>, <span class="cs">"G"</span>, <span class="cs">"PT"</span>]  <span class="cc">// 3 tokens</span>
+<span class="cs">"🏠"</span>       → [<span class="cs">"🏠"</span>]             <span class="cc">// 1 token</span>
+<span class="cs">"$450,000"</span> → [<span class="cs">"$"</span>, <span class="cs">"450"</span>, <span class="cs">","</span>, <span class="cs">"000"</span>] <span class="cc">// 4 tokens</span></pre>
+      </div>
+      <div class="card">
+        <h3>Why You Should Care</h3>
+        <ul>
+          <li><strong>Cost</strong> — you pay per token, both input and output</li>
+          <li><strong>Limits</strong> — context window is measured in tokens</li>
+          <li><strong>Speed</strong> — more tokens = slower response</li>
+          <li><strong>Multilingual</strong> — non-English text uses more tokens per word</li>
+        </ul>
+      </div>
+    </div>
+    <div class="highlight-box animate-in">
+      <h3>The Cost Reality</h3>
+      <p>100 API calls with Claude Sonnet costs ~$0.30. Your entire hackathon's API usage will probably cost less than lunch. Don't let cost anxiety slow you down.</p>
+    </div>
+  </div>
+
+  <!-- ============ SLIDE 6: The API Call ============ -->
+  <div class="slide" data-slide="4" data-notes="I want to demystify this right now.
+
+⤵ Expand the code block — walk through it:
+
+Line 1: pip install, import.
+Line 2: client reads your API key from the environment.
+Line 3-6: messages.create — you give it a model, a max length, and a list of messages.
+Last line: pull the text out of the response.
+
+That's five lines. That's the entire thing.
+
+💡 NUGGETS worth dropping:
+• The &quot;system&quot; prompt is a separate parameter — persistent instructions the model follows across all messages. Use it for role, rules, output format.
+• &quot;messages&quot; is a list of {role, content} dicts. You can pre-fill assistant messages to steer behavior — this is called &quot;few-shot prompting.&quot;
+• Add stream=True to get tokens back in real-time instead of waiting for the full response. Better UX for chat apps.
+
+★ Quote box:
+Every framework you've heard of is a wrapper around these five lines.
+Start here. You might not need anything else this weekend.
+
+~2 min">
+    <h2 class="animate-in">The API Call: <span class="glow-text">It's Just HTTP</span></h2>
+    <p class="subtitle animate-in">Strip away every framework and abstraction.<br>This is all it is.</p>
+    <pre class="code-block animate-in"><span class="ck">import</span> anthropic                              <span class="cc"># pip install anthropic</span>
+
+client = anthropic.Anthropic()                 <span class="cc"># uses ANTHROPIC_API_KEY env var</span>
+
+response = client.messages.<span class="cf">create</span>(             <span class="cc"># send request → get response</span>
+    <span class="cp">model</span>=<span class="cs">'claude-sonnet-4-20250514'</span>,
+    <span class="cp">max_tokens</span>=<span class="cn">1024</span>,
+    <span class="cp">messages</span>=[
+        {<span class="cs">'role'</span>: <span class="cs">'user'</span>, <span class="cs">'content'</span>: <span class="cs">'What is machine learning?'</span>}
+    ]
+)
+
+<span class="cf">print</span>(response.content[<span class="cn">0</span>].text)               <span class="cc"># extract text from response</span></pre>
+    <div class="quote-block animate-in">
+      <p>Five lines of real code. Everything else — LangChain, LlamaIndex, frameworks — is a wrapper around this.</p>
+    </div>
+  </div>
+
+  <!-- ============ SLIDE 7: Prompt Engineering ============ -->
+  <div class="slide" data-slide="5" data-notes="This is your single highest-ROI skill for the weekend.
+
+⤵ Expand left card — walk the prompt top to bottom:
+
+ROLE — tell it WHO it is. &quot;Senior backend engineer&quot; gives you totally different code than &quot;helpful assistant.&quot;
+
+CONTEXT — tell it YOUR stack. Without this it guesses wrong.
+
+TASK — ONE clear instruction. Vague task = bad output, every time.
+
+CONSTRAINTS — without these, the model over-engineers. Adds features you didn't ask for.
+
+FORMAT — &quot;only code, no explanation.&quot; Saves you from stripping preamble.
+
+⤵ Expand right card — color-coded breakdown of WHY each section matters.
+
+💡 ADVANCED TECHNIQUES (mention briefly):
+• Few-shot prompting — include 2-3 examples of input→output in your prompt. Model pattern-matches off them. Most reliable way to control format.
+• Chain-of-thought — add &quot;think step by step&quot; or give a scratchpad. Forces reasoning before answering. Huge accuracy boost on complex tasks.
+• System prompt persists across the whole conversation. Put role + constraints there so you don't repeat every message.
+
+★ This prompt isn't clever. It's just organized.
+Structure beats cleverness every time.
+
+~3 min">
+    <h2 class="animate-in"><span class="glow-text">Prompt Engineering</span></h2>
+    <p class="subtitle animate-in" style="margin-bottom: 10px;">Give the model distinct sections.<br>Each one constrains its output differently.</p>
+    <div class="cards cards-2 animate-in" style="gap: 12px; align-items: start;">
+      <div class="card" style="padding: 14px;">
+        <h3 style="font-size: 0.9rem; margin-bottom: 8px;">The Prompt <span style="font-size: 0.7rem; color: var(--text-muted); font-weight: 400;">— one effective pattern</span></h3>
+        <div style="border: 1px solid rgba(96,165,250,0.25); border-radius: 8px; padding: 10px 14px; margin-bottom: 10px; background: rgba(96,165,250,0.04);">
+          <div style="font-size: 0.7rem; color: var(--cyan); font-family: 'JetBrains Mono', monospace; margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.08em;">System message</div>
+          <pre class="code-block" style="margin: 0; font-size: 0.75rem; line-height: 1.55; background: transparent; border: none; padding: 0;"><span class="cc"># Your code builds this template once</span>
+<span class="cc"># <span style="color: #fbbf24;">{vars}</span> are injected at runtime — dates, user data, docs</span>
+
+<span style="color: var(--green); font-weight: 600;">ROLE:</span> <span style="color: var(--green);">You are a senior backend engineer
+who writes clean, production-ready Python.</span>
+
+<span style="color: var(--cyan); font-weight: 600;">CONTEXT:</span> <span style="color: var(--cyan);">Stack: FastAPI + SQLAlchemy, PostgreSQL 15.
+Today's date: <span style="color: #fbbf24; font-weight: 600;">{date}</span>
+User timezone: <span style="color: #fbbf24; font-weight: 600;">{timezone}</span>
+Order model: id, user_id, total, status, created_at</span>
+
+<span style="color: var(--warn); font-weight: 600;">CONSTRAINTS:</span> <span style="color: var(--warn);">Max 50 results, support pagination,
+sort by created_at DESC, return empty list if none,
+use typed Pydantic response models.</span>
+
+<span style="color: var(--red); font-weight: 600;">FORMAT:</span> <span style="color: var(--red);">Respond with only Python code. No explanation.</span></pre>
+        </div>
+        <div style="text-align: center; color: var(--text-muted); font-size: 0.72rem; margin: 4px 0; font-family: 'JetBrains Mono', monospace;">both sent together on each API call</div>
+        <div style="border: 1px solid rgba(74,222,128,0.25); border-radius: 8px; padding: 10px 14px; background: rgba(74,222,128,0.04);">
+          <div style="font-size: 0.7rem; color: var(--green); font-family: 'JetBrains Mono', monospace; margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.08em;">User message</div>
+          <pre class="code-block" style="margin: 0; font-size: 0.75rem; line-height: 1.55; background: transparent; border: none; padding: 0;"><span class="cc"># This changes every turn — the actual request</span>
+
+<span style="color: var(--accent);">I need an endpoint that returns a user's
+most recent orders. Something like
+GET /users/{user_id}/orders</span></pre>
+        </div>
+      </div>
+      <div class="card" style="padding: 14px;">
+        <h3 style="font-size: 0.9rem; margin-bottom: 8px;">Why Each Section Matters</h3>
+        <div style="font-size: 0.82rem; display: flex; flex-direction: column; gap: 10px;">
+          <div>
+            <h4 style="color: var(--green); font-size: 0.82rem;">Role</h4>
+            <p>Sets expertise level and voice. "Senior backend engineer" produces different code than "helpful assistant."</p>
+          </div>
+          <div>
+            <h4 style="color: var(--cyan); font-size: 0.82rem;">Context</h4>
+            <p>This can be your stack, your data, your user — whatever your code injects at runtime.</p>
+          </div>
+          <div>
+            <h4 style="color: var(--accent); font-size: 0.82rem;">Task</h4>
+            <p>One clear instruction. Ambiguity here is the #1 cause of bad outputs.</p>
+          </div>
+          <div>
+            <h4 style="color: var(--warn); font-size: 0.82rem;">Constraints</h4>
+            <p>Prevents over-engineering and scope creep. The model will add features you didn't ask for without these.</p>
+          </div>
+          <div>
+            <h4 style="color: var(--red); font-size: 0.82rem;">Format</h4>
+            <p>Controls output shape. "Only code, no explanation" eliminates preamble you'd have to strip.</p>
+          </div>
+        </div>
+        <div style="margin-top: 14px; padding-top: 12px; border-top: 1px solid rgba(129,140,248,0.1);">
+          <h4 style="color: var(--accent-bright); font-size: 0.82rem; margin-bottom: 8px;">How the API Call Works</h4>
+          <div style="font-size: 0.82rem; display: flex; flex-direction: column; gap: 6px;">
+            <p>The left card shows how these sections map to the actual API call. Both are sent together on every request:</p>
+            <p><span style="color: var(--cyan); font-weight: 600;">System message</span> — the model's <em>job description</em>. The template stays the same, but your code injects variables at runtime — current date, user preferences, retrieved documents, etc. LLMs are stateless, so you re-send it on every call.</p>
+            <p><span style="color: var(--green); font-weight: 600;">User message</span> — the <em>work ticket</em>. This is the only part that changes per turn.</p>
+            <p style="color: var(--text-muted); font-style: italic; margin-top: 4px;">This split is a guideline. If context varies per request (e.g., different data), move it to the user message.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ SLIDE 8: Narrative Pivot ============ -->
+  <div class="slide" data-slide="6" data-notes="[PAUSE — let this land]
+
+So now you can call an LLM and write a good prompt.
+
+But here's the problem…
+The model has never seen YOUR docs. YOUR database. YOUR product.
+It only knows what you put in the context window.
+
+So how do you give it your knowledge?
+
+That's what the next three concepts answer.
+
+~30 sec">
+    <h2 class="animate-in" style="font-size: 2.2rem;">You can call an LLM and prompt it well.<br><br><span class="glow-text" style="font-size: 2.6rem;">But what about YOUR data?</span></h2>
+    <p class="subtitle animate-in">The model only knows what's in the context window.<br>It hasn't read your docs, your database, or your product.<br>How do you give it that knowledge?</p>
+    <div class="divider animate-in"></div>
+    <p class="aside animate-in" style="text-align: center;">This is where embeddings, RAG, and memory come in.</p>
+  </div>
+
+  <!-- ============ SLIDE 9: Embeddings ============ -->
+  <div class="slide" data-slide="7" data-notes="Embeddings let you turn text into numbers — specifically, into coordinates in a &quot;meaning space.&quot;
+
+Point to the scatter plot:
+These clusters formed automatically — animals here, finance there, cooking down here.
+
+Now the three cards at the bottom — this is the payoff:
+
+&quot;dog ran fast&quot; vs &quot;puppy sprinted&quot; — 0.92. Nearly identical meaning.
+&quot;chocolate cake&quot; vs &quot;brownies&quot; — 0.89. Same neighborhood.
+&quot;dog ran fast&quot; vs &quot;stock market&quot; — 0.11. Completely unrelated.
+
+💡 NUGGETS:
+• These vectors are high-dimensional — OpenAI's ada-002 outputs 1,536 dimensions. Can't visualize it, but the math works same as 2D.
+• Cosine similarity measures the angle between vectors. 1.0 = identical direction, 0 = unrelated. Think &quot;how much do these point the same way?&quot;
+• Embedding models are separate from chat models — smaller, faster, cheaper. You'll use one like text-embedding-3-small or Voyage.
+
+★ If you can measure similarity, you can SEARCH your data by meaning instead of keywords.
+That's the foundation for what comes next.
+
+
+🔴 DEMO — Spacer: Video Transcript Embeddings
+Open Milvus console or code. Show the video_transcripts collection.
+• YouTube transcripts chunked into 60-90 sec segments
+• Each chunk → text-embedding-3-small → 1536-dim vector
+• Stored with metadata: agent_id, video_id, start_time, end_time, lat/lng
+• &quot;We took hours of local guide videos and turned them into searchable meaning&quot;
+Point out: this is the same embedding concept from the slide, applied to real video content.
+~2 min">
+    <h2 class="animate-in">Embeddings: <span class="cyan-text">Coordinates in Meaning Space</span></h2>
+    <p class="subtitle animate-in" style="margin-bottom: 12px;">Turn text into numbers so "similar" things are nearby.<br>Like GPS coordinates, but for meaning.</p>
+    <div class="animate-in" style="position: relative; width: min(70vw, 700px); margin: 8px 0;">
+      <svg viewBox="0 0 700 400" style="width: 100%; height: auto; display: block;">
+        <!-- Background -->
+        <rect x="0" y="0" width="700" height="400" rx="12" fill="rgba(129,140,248,0.03)" stroke="rgba(129,140,248,0.1)" stroke-width="1"/>
+        <!-- Grid lines -->
+        <line x1="50" y1="380" x2="680" y2="380" stroke="rgba(129,140,248,0.08)" stroke-width="1"/>
+        <line x1="50" y1="20" x2="50" y2="380" stroke="rgba(129,140,248,0.08)" stroke-width="1"/>
+        <!-- Axis labels -->
+        <text x="370" y="398" fill="#7a829e" font-size="11" font-family="JetBrains Mono, monospace" text-anchor="middle">dimension 1</text>
+        <text x="14" y="200" fill="#7a829e" font-size="11" font-family="JetBrains Mono, monospace" text-anchor="middle" transform="rotate(-90, 14, 200)">dimension 2</text>
+        <!-- Cluster 1: Animals (cyan) — top left -->
+        <circle cx="120" cy="100" r="6" fill="#60a5fa" filter="url(#glow-cyan)"/>
+        <text x="136" y="105" fill="#b0b8d1" font-size="12" font-family="JetBrains Mono, monospace">"dog ran fast"</text>
+        <circle cx="140" cy="150" r="6" fill="#60a5fa" filter="url(#glow-cyan)"/>
+        <text x="156" y="155" fill="#b0b8d1" font-size="12" font-family="JetBrains Mono, monospace">"puppy sprinted"</text>
+        <circle cx="105" cy="195" r="6" fill="#60a5fa" filter="url(#glow-cyan)"/>
+        <text x="121" y="200" fill="#b0b8d1" font-size="12" font-family="JetBrains Mono, monospace">"the hound dashed"</text>
+        <!-- Cluster 2: Finance (purple) — top right -->
+        <circle cx="500" cy="80" r="6" fill="#818cf8" filter="url(#glow-accent)"/>
+        <text x="516" y="85" fill="#b0b8d1" font-size="12" font-family="JetBrains Mono, monospace">"stock market crashed"</text>
+        <circle cx="520" cy="135" r="6" fill="#818cf8" filter="url(#glow-accent)"/>
+        <text x="536" y="140" fill="#b0b8d1" font-size="12" font-family="JetBrains Mono, monospace">"economy in recession"</text>
+        <!-- Cluster 3: Cooking (pink) — bottom center -->
+        <circle cx="300" cy="290" r="6" fill="#c084fc" filter="url(#glow-warn)"/>
+        <text x="316" y="295" fill="#b0b8d1" font-size="12" font-family="JetBrains Mono, monospace">"bake a chocolate cake"</text>
+        <circle cx="320" cy="340" r="6" fill="#c084fc" filter="url(#glow-warn)"/>
+        <text x="336" y="345" fill="#b0b8d1" font-size="12" font-family="JetBrains Mono, monospace">"recipe for brownies"</text>
+        <!-- Glow filters -->
+        <defs>
+          <filter id="glow-cyan"><feDropShadow dx="0" dy="0" stdDeviation="4" flood-color="#60a5fa" flood-opacity="0.6"/></filter>
+          <filter id="glow-accent"><feDropShadow dx="0" dy="0" stdDeviation="4" flood-color="#818cf8" flood-opacity="0.6"/></filter>
+          <filter id="glow-warn"><feDropShadow dx="0" dy="0" stdDeviation="4" flood-color="#c084fc" flood-opacity="0.6"/></filter>
+        </defs>
+      </svg>
+    </div>
+    <div class="cards cards-3 animate-in" style="margin-top: 10px;">
+      <div class="card" style="text-align: center; padding: 10px;">
+        <p style="font-size: 0.8rem; color: var(--cyan);">"dog ran fast"<br>↔ "puppy sprinted quickly"</p>
+        <p style="font-size: 1.4rem; font-weight: 700; color: var(--green);">0.92</p>
+        <p style="font-size: 0.7rem; color: var(--text-secondary);">cosine similarity</p>
+      </div>
+      <div class="card" style="text-align: center; padding: 10px;">
+        <p style="font-size: 0.8rem; color: var(--warn);">"bake a chocolate cake"<br>↔ "recipe for brownies"</p>
+        <p style="font-size: 1.4rem; font-weight: 700; color: var(--green);">0.89</p>
+        <p style="font-size: 0.7rem; color: var(--text-secondary);">cosine similarity</p>
+      </div>
+      <div class="card" style="text-align: center; padding: 10px;">
+        <p style="font-size: 0.8rem; color: var(--cyan);">"dog ran fast"<br>↔ "stock market crashed"</p>
+        <p style="font-size: 1.4rem; font-weight: 700; color: var(--red);">0.11</p>
+        <p style="font-size: 0.7rem; color: var(--text-secondary);">cosine similarity</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ SLIDE 10: RAG Pipeline ============ -->
+  <div class="slide" data-slide="8" data-notes="★ This is the most important pattern for the hackathon.
+
+The idea is dead simple:
+Don't train the model on your data.
+Just find the relevant pieces and paste them into the prompt.
+
+⤵ Walk the flow — click each step for detail:
+
+User asks a question.
+You embed it — same math we just saw.
+You search your pre-embedded docs — cosine similarity, pure math, deterministic.
+You paste the top matches into the prompt.
+The LLM answers using that context.
+
+⤵ Expand &quot;When RAG Works&quot; — docs, knowledge bases, frequently changing data, citations.
+
+⤵ Expand &quot;When RAG Fails&quot; — this is important:
+If your chunking is bad, you retrieve the wrong passage.
+The model then confidently answers from irrelevant context.
+
+💡 NUGGETS on chunking:
+• Chunk size matters — too small = lose context, too big = waste tokens. Start ~500 tokens/chunk with ~50 token overlap.
+• Hybrid search = vector similarity + keyword matching (BM25). Catches exact product names and error codes that embeddings miss.
+• Reranking: use a small model to re-score top 20 results, send top 3-5 to LLM. Significant quality boost for little effort.
+
+★ RAG quality is a SEARCH problem, not an AI problem.
+Bad answers? Fix your retrieval first.
+
+
+🔴 DEMO — Spacer: Transaction Docs RAG Pipeline
+Show the contract chat — upload a purchase agreement PDF, then ask a question.
+
+The full pipeline in one feature:
+1. PDF uploaded → PyMuPDF extracts text + form fields
+2. RecursiveCharacterTextSplitter: 1000-char chunks, 200-char overlap
+3. Each chunk → text-embedding-3-small → 1536-dim vector
+4. Stored in Milvus &quot;spacer_contracts&quot; collection with contract_id, page_number, chunk_index
+5. User asks &quot;when is the inspection deadline?&quot;
+6. Query embedded → top 5 chunks by cosine similarity (filtered by contract_id)
+7. Chunks injected into GPT-4o prompt → streams answer with page number citations
+
+&quot;This is the exact 5-step RAG pipeline from the slide — with real contracts.&quot;
+
+Also show: document type classification (contract vs disclosure vs inspection) — the model classifies from the first ~3000 chars with a confidence score. That's structured output feeding back into the pipeline.
+
+~3 min">
+    <h2 class="animate-in"><span class="glow-text">RAG</span>: Retrieval-Augmented Generation</h2>
+    <p class="subtitle animate-in" style="margin-bottom: 12px;">Don't train the model on your data.<br>Just retrieve the relevant parts and put them in the prompt.</p>
+    <div class="flow animate-in pipeline-flow">
+      <div class="flow-step attention-trigger" style="--d:0.4s;" onclick="togglePipeline('rag-query')"><h4>1. Query</h4><p>User asks a question</p><p style="font-size:0.7rem;color:var(--text-muted);margin-top:4px;">user input</p></div>
+      <div class="flow-arrow" style="--d:0.6s">&#8594;</div>
+      <div class="flow-step attention-trigger" style="--d:0.8s;" onclick="togglePipeline('rag-embed')"><h4>2. Embed</h4><p>Convert query to vector</p><p style="font-size:0.7rem;color:var(--cyan);margin-top:4px;">model</p></div>
+      <div class="flow-arrow" style="--d:1.0s">&#8594;</div>
+      <div class="flow-step attention-trigger" style="--d:1.2s;" onclick="togglePipeline('rag-search')"><h4>3. Search</h4><p>Find similar chunks</p><p style="font-size:0.7rem;color:var(--green);margin-top:4px;">deterministic</p></div>
+      <div class="flow-arrow" style="--d:1.4s">&#8594;</div>
+      <div class="flow-step attention-trigger" style="--d:1.6s;" onclick="togglePipeline('rag-augment')"><h4>4. Augment</h4><p>Inject into prompt</p><p style="font-size:0.7rem;color:var(--green);margin-top:4px;">deterministic</p></div>
+      <div class="flow-arrow" style="--d:1.8s">&#8594;</div>
+      <div class="flow-step attention-trigger" style="--d:2.0s;" onclick="togglePipeline('rag-generate')"><h4>5. Generate</h4><p>LLM answers with context</p><p style="font-size:0.7rem;color:var(--cyan);margin-top:4px;">LLM</p></div>
+    </div>
+    <div class="cards cards-2 animate-in" style="margin-top: 14px;">
+      <div class="card">
+        <h3>When RAG Works</h3>
+        <ul>
+          <li>Q&amp;A over documents, knowledge bases, product data</li>
+          <li>Data changes frequently (no retraining needed)</li>
+          <li>You need the model to cite sources</li>
+        </ul>
+      </div>
+      <div class="card card-warn">
+        <h3>When RAG Fails</h3>
+        <ul>
+          <li>Bad chunking retrieves the wrong passage</li>
+          <li>Answer sounds right but pulls from irrelevant context</li>
+          <li>RAG quality is an Information Retrieval (IR) problem, not an LLM problem</li>
+        </ul>
+      </div>
+    </div>
+    <p class="aside animate-in">RAG quality is a search problem, not an AI problem. Bad answers? Fix your retrieval first.</p>
+  </div>
+
+  <!-- ============ SLIDE 11: Structured Output ============ -->
+  <div class="slide" data-slide="9" data-notes="This is the bridge between a demo and a real feature.
+
+⤵ Expand left card — free text:
+Output looks different every time. Your code has to guess where the rating is, where the price is. Fragile.
+
+⤵ Expand right card — structured JSON:
+Same info, but now it's a dict. Parse it with json.loads(). Drop it into your UI.
+
+⤵ Click each card for the code — notice the only difference:
+You add a system prompt saying &amp;quot;respond only in JSON&amp;quot; and a quick regex cleanup.
+
+💡 NUGGETS:
+• Claude and GPT support &amp;quot;tool use&amp;quot; to GUARANTEE valid JSON — model is forced to output schema-compliant response. More reliable than asking nicely.
+• In Python: define schema as Pydantic model, pass it. Get typed, validated objects back — no parsing, no regex.
+• If just prompting for JSON (not tool use), always validate. Models sometimes add markdown backticks or trailing text.
+
+★ If your app needs to DO something with the AI output — display it, store it, route on it — you need structured output.
+
+🔴 DEMO — Spacer: Preference Extraction (Structured Output)
+Show the preference extractor output from a real note.
+
+User writes: &amp;quot;love the backyard but too far from schools, need at least 3 beds&amp;quot;
+
+LLM extracts a full PreferenceProfile — Pydantic-enforced schema:
+• must_haves, dealbreakers, property_preferences — all typed
+• Each signal gets a confidence score AND a source weight:
+  explicit=1.0, agent_note=0.85, note=0.80, chat=0.70, behavior=0.50
+• Recency decay: 30-day half-life — older signals fade automatically
+
+Show the delta approach: compare old profile vs new → only emit what CHANGED (added/removed/updated). Saves tokens, creates audit trail.
+
+Also extracts buyer_psyche: household, lifestyle, motivations, decision style, financial — all structured.
+
+&amp;quot;Free text in, structured data out. The app never parses strings — it works with typed objects.&amp;quot;
+
+~2 min">
+    <h2 class="animate-in">Structured Output: <span class="cyan-text">Making AI Predictable</span></h2>
+    <p class="subtitle animate-in" style="margin-bottom: 14px;">The bridge between "cool demo" and "reliable feature."</p>
+    <div class="cards cards-2 animate-in" style="max-width: 950px; gap: 16px; align-items: start;">
+      <div class="card attention-trigger" style="padding: 18px; border-color: rgba(248,113,113,0.2);" onclick="togglePipeline('freetext')">
+        <h3 style="color: var(--red); font-size: 1rem;">Free Text Response</h3>
+        <pre style="font-family: 'JetBrains Mono', monospace; font-size: 0.82rem; color: var(--text-primary); line-height: 1.5; white-space: pre-wrap; margin: 10px 0;">The product has a rating of about 4.5 stars.
+Most users liked it. Some complained about
+the weight. Price is $299.</pre>
+        <ul style="margin-top: 10px;">
+          <li>Output varies every time</li>
+          <li>No consistent structure to parse</li>
+          <li>Your code has to guess the format</li>
+        </ul>
+      </div>
+      <div class="card attention-trigger" style="padding: 18px; border-color: rgba(74,222,128,0.2);" onclick="togglePipeline('structured')">
+        <h3 style="color: var(--green); font-size: 1rem;">JSON Structured Output</h3>
+        <pre style="font-family: 'JetBrains Mono', monospace; font-size: 0.82rem; color: var(--text-primary); line-height: 1.5; white-space: pre-wrap; margin: 10px 0;">{
+  "rating": 4.5,
+  "pros": ["battery life", "display"],
+  "cons": ["weight"],
+  "price": 299,
+  "recommendation": "buy"
+}</pre>
+        <ul style="margin-top: 10px;">
+          <li>Predictable shape every time</li>
+          <li>Parse with <code style="color: var(--cyan);">json.loads()</code></li>
+          <li>Feed directly into your UI or DB</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ SLIDE 12: Memory ============ -->
+  <div class="slide" data-slide="10" data-notes="This trips everyone up at first.
+
+LLMs have NO memory between calls.
+Every single API call starts completely fresh.
+If you want a conversation, YOU have to send the history every time.
+
+Click through the four tabs:
+
+⤵ [Buffer] — just keep a list. Append every message. Send the whole list each call. Dead simple.
+★ Start here for the hackathon. It's five lines of code.
+
+⤵ [Summary] — when the list gets too long, ask the AI to summarize older messages. Send summary + recent.
+
+⤵ [Vector Recall] — embed past turns, retrieve only the relevant ones. Same cosine math as RAG.
+
+⤵ [Structured] — extract facts into a database, query them back into prompts. Production-grade.
+
+💡 NUGGETS:
+• Token counting tip: use tiktoken (OpenAI) or anthropic's token counting API to check size BEFORE sending. Avoids context overflow errors.
+• Claude and GPT both support prompt caching — if first N tokens are identical across calls, you get a discount + speed boost. Put system prompt and static context first.
+• Practical hybrid: buffer last 10 messages, summarize everything older, prepend summary as system context. Easy to implement, handles long sessions.
+
+You probably won't need anything beyond Buffer this weekend.
+
+
+🔴 DEMO — Spacer: Three Memory Strategies in One App
+This is the money demo — Spacer uses 3 of the 4 memory types:
+
+⤵ [Buffer] — Chat threads:
+Show ChatThread + ChatMessage models. Every message stored in Postgres.
+Full history sent to LLM each call. Exactly the pattern on this slide.
+
+⤵ [Vector Recall] — CID listings + transcripts:
+Show Milvus query. Past interactions embedded and retrieved by similarity.
+&quot;When a buyer asks about a property, we don't send every past conversation — we find the RELEVANT ones.&quot;
+
+⤵ [Structured] — Preference signals:
+Show the PreferenceSignal model — extracted facts stored in DB.
+field, value, confidence, source, evidence.
+&quot;The AI extracts what matters, stores it as structured data, and we query it back into future prompts.&quot;
+
+★ &quot;Same app, three memory strategies, each for a different purpose. That's what it looks like in production.&quot;
+~3 min">
+    <h2 class="animate-in">Memory: <span class="cyan-text">Making AI Remember</span></h2>
+    <p class="subtitle animate-in" style="margin-bottom: 10px;">LLMs are stateless. Every API call starts fresh.<br>If you want a conversation, YOU send the history.</p>
+    <div class="tags animate-in" style="margin-bottom: 12px;">
+      <span class="tag" style="cursor:pointer; border-color: var(--green); color: var(--green);" onclick="showMemPanel(0)">1. Buffer</span>
+      <span class="tag" style="cursor:pointer; border-color: var(--accent); color: var(--accent);" onclick="showMemPanel(1)">2. Summary</span>
+      <span class="tag" style="cursor:pointer; border-color: var(--cyan); color: var(--cyan);" onclick="showMemPanel(2)">3. Vector Recall</span>
+      <span class="tag" style="cursor:pointer; border-color: var(--warn); color: var(--warn);" onclick="showMemPanel(3)">4. Structured</span>
+    </div>
+    <div class="memory-carousel animate-in" style="position: relative; width: 100%; max-width: 700px;">
+      <div class="memory-panels" id="memory-panels">
+        <div class="memory-panel active" data-mem="0">
+          <div class="card attention-trigger" style="padding: 24px 28px;" onclick="togglePipeline('mem-buffer')">
+            <h3 style="color: var(--green); font-size: 1.1rem; margin-bottom: 10px;">1. Conversation Buffer</h3>
+            <p style="font-size: 0.95rem; margin-bottom: 14px;">Send the full chat history every call. The list grows each turn.</p>
+            <div style="font-size: 0.95rem; color: var(--text-primary); line-height: 1.8; background: var(--bg-primary); border-radius: 8px; padding: 16px 20px;">
+              <span style="color: var(--green);">1.</span> You maintain a list of all messages<br>
+              <span style="color: var(--green);">2.</span> Each call sends the <em>entire</em> list to the AI<br>
+              <span style="color: var(--green);">3.</span> AI responds based on the full conversation<br>
+              <span style="color: var(--green);">4.</span> You add both the new message and response to the list<br>
+              <span style="color: var(--green);">5.</span> List grows every turn — AI sees everything
+            </div>
+            <p style="font-size: 0.88rem; color: var(--green); margin-top: 14px; text-align: center;">Simple. Start here. Works until you hit context limits.</p>
+          </div>
+        </div>
+        <div class="memory-panel" data-mem="1">
+          <div class="card attention-trigger" style="padding: 24px 28px;" onclick="togglePipeline('mem-summary')">
+            <h3 style="color: var(--accent); font-size: 1.1rem; margin-bottom: 10px;">2. Summary Memory</h3>
+            <p style="font-size: 0.95rem; margin-bottom: 14px;">When history gets long, ask the AI to compress it.</p>
+            <div style="font-size: 0.95rem; color: var(--text-primary); line-height: 1.8; background: var(--bg-primary); border-radius: 8px; padding: 16px 20px;">
+              <span style="color: var(--accent);">1.</span> History gets too long for the context window<br>
+              <span style="color: var(--accent);">2.</span> Ask the AI to summarize older messages<br>
+              <span style="color: var(--accent);">3.</span> Cache the summary (a short text string)<br>
+              <span style="color: var(--accent);">4.</span> Future calls send: summary + recent messages<br>
+              <span style="color: var(--accent);">5.</span> Re-summarize periodically as conversation grows
+            </div>
+            <p style="font-size: 0.88rem; color: var(--accent); margin-top: 14px; text-align: center;">Trades detail for token savings. Good for longer sessions.</p>
+          </div>
+        </div>
+        <div class="memory-panel" data-mem="2">
+          <div class="card attention-trigger" style="padding: 24px 28px;" onclick="togglePipeline('mem-vector')">
+            <h3 style="color: var(--cyan); font-size: 1.1rem; margin-bottom: 10px;">3. Vector Recall</h3>
+            <p style="font-size: 0.95rem; margin-bottom: 14px;">Don't send everything — retrieve only the relevant past turns.</p>
+            <div style="font-size: 0.95rem; color: var(--text-primary); line-height: 1.8; background: var(--bg-primary); border-radius: 8px; padding: 16px 20px;">
+              <span style="color: var(--cyan);">1.</span> Embed every past turn and store as vectors<br>
+              <span style="color: var(--cyan);">2.</span> When a new question arrives, embed it too<br>
+              <span style="color: var(--cyan);">3.</span> Find the most similar past turns (cosine similarity)<br>
+              <span style="color: var(--cyan);">4.</span> Send only those relevant turns + the new question<br>
+              <span style="color: var(--cyan);">5.</span> AI responds with context it actually needs
+            </div>
+            <p style="font-size: 0.88rem; color: var(--cyan); margin-top: 14px; text-align: center;">Same cosine math as RAG. Best for apps with long histories.</p>
+          </div>
+        </div>
+        <div class="memory-panel" data-mem="3">
+          <div class="card attention-trigger" style="padding: 24px 28px;" onclick="togglePipeline('mem-structured')">
+            <h3 style="color: var(--warn); font-size: 1.1rem; margin-bottom: 10px;">4. Structured Knowledge</h3>
+            <p style="font-size: 0.95rem; margin-bottom: 14px;">Extract facts from conversations. Store in a database. Query as needed.</p>
+            <div style="font-size: 0.95rem; color: var(--text-primary); line-height: 1.8; background: var(--bg-primary); border-radius: 8px; padding: 16px 20px;">
+              <span style="color: var(--warn);">1.</span> Ask the AI to extract structured facts from conversation<br>
+              <span style="color: var(--warn);">2.</span> Store them in a database (preferences, goals, etc.)<br>
+              <span style="color: var(--warn);">3.</span> On future calls, query the DB for relevant facts<br>
+              <span style="color: var(--warn);">4.</span> Inject those facts into the prompt<br>
+              <span style="color: var(--warn);">5.</span> AI responds with precise, persistent knowledge
+            </div>
+            <p style="font-size: 0.88rem; color: var(--warn); margin-top: 14px; text-align: center;">Most complex. Best for production systems.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ SLIDE 13: Tool Use ============ -->
+  <div class="slide" data-slide="11" data-notes="Here's where AI gets powerful — but the safety model matters.
+
+The model NEVER runs code.
+It tells you what it WANTS to do. Your code decides whether to actually do it.
+
+⤵ Expand left card + click for code:
+You define a tool — name, description, what inputs it takes. Model reads this like a menu.
+
+⤵ Expand right card + click for code:
+You pass the tools alongside the user's message. Model says &quot;I want to call get_weather with city Dallas.&quot; Your code calls the real API. You send the result back.
+
+Walk the flow at bottom — User → Model requests → Your code runs → Model formats.
+
+💡 NUGGETS:
+• Models can request MULTIPLE tools in one response — parallel tool calls. E.g., get weather in Dallas AND lookup user's calendar simultaneously.
+• Tool descriptions matter more than you think. Vague description = model picks wrong tool. Write them like explaining to a new engineer.
+• The tool result goes back as a &quot;tool_result&quot; message. Model generates final natural language incorporating that data — multi-turn conversation under the hood.
+
+★ The model requests. You execute. That's the whole pattern.
+That's also your safety boundary.
+
+
+🔴 DEMO — Spacer: CMA Agent Tools
+Show the CMA tools definition in tools.py.
+• comps_search — queries MLS for comparable properties
+• price_adjustments — adjusts for bedrooms, condition, location
+• check_cma_credits — checks if user has credits remaining
+• Each tool: name, description, input_schema — exactly the pattern from this slide
+
+Show a CMA run — the model decides WHICH tool to call based on where it is in the analysis.
+&quot;The model reads the tool menu, picks comps_search, we run the MLS query, send results back. Same request/execute pattern — just with real estate data.&quot;
+
+💡 BONUS: CID listings have MODE-DEPENDENT tools — buyers get showing_schedule, sellers get different tools. Same agent, different tool menu based on who's logged in.
+~2 min">
+    <h2 class="animate-in">Tool Use: <span class="glow-text">Letting AI Do Things</span></h2>
+    <p class="subtitle animate-in" style="margin-bottom: 14px;">The model requests actions. Your code executes them.<br>The model never runs code directly.</p>
+    <div class="cards cards-2 animate-in" style="max-width: 950px; gap: 16px; align-items: start;">
+      <div class="card attention-trigger" style="padding: 20px 24px;" onclick="togglePipeline('tool-define')">
+        <h3 style="color: var(--cyan); font-size: 1rem;">1. Define the Tool</h3>
+        <div style="font-size: 0.95rem; color: var(--text-primary); line-height: 1.8; background: var(--bg-primary); border-radius: 8px; padding: 16px 20px; margin-top: 12px;">
+          <span style="color: var(--cyan);">1.</span> Give each tool a name and description<br>
+          <span style="color: var(--cyan);">2.</span> Define what inputs it accepts (JSON schema)<br>
+          <span style="color: var(--cyan);">3.</span> The model reads this to understand what's available
+        </div>
+      </div>
+      <div class="card attention-trigger" style="padding: 20px 24px;" onclick="togglePipeline('tool-use')">
+        <h3 style="color: var(--green); font-size: 1rem;">2. Pass Tools to the API</h3>
+        <div style="font-size: 0.95rem; color: var(--text-primary); line-height: 1.8; background: var(--bg-primary); border-radius: 8px; padding: 16px 20px; margin-top: 12px;">
+          <span style="color: var(--green);">1.</span> Send your tools list alongside the user message<br>
+          <span style="color: var(--green);">2.</span> Model decides if a tool is needed<br>
+          <span style="color: var(--green);">3.</span> If yes: returns tool name + inputs<br>
+          <span style="color: var(--green);">4.</span> Your code executes the actual function
+        </div>
+      </div>
+    </div>
+    <div class="flow animate-in" style="margin-top: 14px;">
+      <div class="flow-step" style="--d:0.4s"><h4>User</h4><p>"Weather in Dallas?"</p></div>
+      <div class="flow-arrow" style="--d:0.6s">&#8594;</div>
+      <div class="flow-step" style="--d:0.8s"><h4>Model</h4><p>Requests <code style="color:var(--cyan);">get_weather</code></p></div>
+      <div class="flow-arrow" style="--d:1.0s">&#8594;</div>
+      <div class="flow-step" style="--d:1.2s"><h4>Your Code</h4><p>Runs the function</p></div>
+      <div class="flow-arrow" style="--d:1.4s">&#8594;</div>
+      <div class="flow-step" style="--d:1.6s"><h4>Model</h4><p>Formats the response</p></div>
+    </div>
+    <p class="aside animate-in" style="text-align: center; margin-top: 10px;">The model requests. You execute. That's the safety boundary.</p>
+  </div>
+
+  <!-- ============ SLIDE 14: Agents (COMMENTED OUT — may use in follow-up session) ============ -->
+  <!--
+  <div class="slide" data-slide="13">
+    <h2 class="animate-in">Agents: <span class="glow-text">Repeated LLM Calls with Tools</span></h2>
+    <p class="subtitle animate-in" style="margin-bottom: 12px;">An agent is a while loop around tool use.<br>The model predicts the next step — your code executes it.</p>
+    <div class="flow animate-in pipeline-flow">
+      <div class="flow-step attention-trigger" style="--d:0.4s; border-color: rgba(192,132,252,0.2);" onclick="togglePipeline('agent-plan')"><h4>1. Plan</h4><p>Model predicts next step</p></div>
+      <div class="flow-arrow" style="--d:0.6s">&#8594;</div>
+      <div class="flow-step attention-trigger" style="--d:0.8s; border-color: rgba(192,132,252,0.2);" onclick="togglePipeline('agent-act')"><h4>2. Act</h4><p>Your code runs the tool</p></div>
+      <div class="flow-arrow" style="--d:1.0s">&#8594;</div>
+      <div class="flow-step attention-trigger" style="--d:1.2s; border-color: rgba(192,132,252,0.2);" onclick="togglePipeline('agent-observe')"><h4>3. Observe</h4><p>Append result to history</p></div>
+      <div class="flow-arrow" style="--d:1.4s">&#8594;</div>
+      <div class="flow-step attention-trigger" style="--d:1.6s; border-color: rgba(192,132,252,0.2);" onclick="togglePipeline('agent-repeat')"><h4>4. Loop</h4><p>Tool call? Continue. Text? Done.</p></div>
+    </div>
+    <div class="cards cards-2 animate-in" style="margin-top: 14px;">
+      <div class="card" style="padding: 16px;">
+        <h3 style="color: var(--green);">When Agents Work</h3>
+        <ul>
+          <li>Task requires multiple tool calls in sequence</li>
+          <li>Each step is well-defined and verifiable</li>
+          <li>Failure at any step can be detected and retried</li>
+        </ul>
+      </div>
+      <div class="card card-warn" style="padding: 16px;">
+        <h3>When Agents Fail</h3>
+        <ul>
+          <li>3 steps at 90% accuracy = 73% overall</li>
+          <li>Errors compound — one bad prediction derails the chain</li>
+          <li>Debugging multi-step failures is painful</li>
+        </ul>
+      </div>
+    </div>
+    <p class="aside animate-in" style="text-align: center; margin-top: 10px;">The model is still just generating tokens — "plan/act" are interpretations of its output.</p>
+  </div>
+  -->
+
+  <!-- ============ SLIDE 14: Model Selection ============ -->
+  <div class="slide" data-slide="12" data-notes="Quick slide — not every task needs the biggest model.
+
+Three axes: quality, speed, cost. You can't max all three.
+
+⤵ Expand cards if audience wants specifics.
+
+💡 NUGGETS:
+• Reasoning models (o1, Claude with extended thinking) spend extra tokens &quot;thinking&quot; before answering. Much better for complex logic/math. But slower and more expensive — use for hard tasks only.
+• Latency matters for UX. Haiku responds in ~200ms. Opus can take 5-10s. If user is waiting on a button click, use fast model. Background job? Use smart one.
+• You can chain models: Haiku classifies → routes hard questions to Sonnet → only complex ones go to Opus. Called a &quot;model router.&quot;
+
+★ The real advice — highlight box:
+Use DIFFERENT models for different tasks in the same app.
+A well-prompted Haiku often beats a lazy Opus prompt.
+
+For the hackathon: Sonnet. Fast, capable, cheap.
+
+~1 min">
+    <h2 class="animate-in">Model Selection: <span class="cyan-text">The Tradeoff Triangle</span></h2>
+    <div class="cards cards-3 animate-in">
+      <div class="card" style="text-align: center;">
+        <h3 style="font-size: 1.3rem;">Quality</h3>
+        <p>Best reasoning, most capable. Slower, costs more.</p>
+        <div class="tags" style="margin-top: 10px;"><span class="tag">Claude Opus</span><span class="tag">GPT-4o</span></div>
+      </div>
+      <div class="card" style="text-align: center;">
+        <h3 style="font-size: 1.3rem; color: var(--cyan);">Speed</h3>
+        <p>Fast responses, good enough for most tasks. Great for real-time UX.</p>
+        <div class="tags" style="margin-top: 10px;"><span class="tag cyan">Claude Sonnet</span><span class="tag cyan">GPT-4o mini</span></div>
+      </div>
+      <div class="card" style="text-align: center;">
+        <h3 style="font-size: 1.3rem; color: var(--green);">Cost</h3>
+        <p>Cheapest per token. Good for high-volume, simpler tasks.</p>
+        <div class="tags" style="margin-top: 10px;"><span class="tag">Claude Haiku</span><span class="tag">Gemini Flash</span></div>
+      </div>
+    </div>
+    <div class="highlight-box animate-in" style="margin-top: 16px;">
+      <h3>Use Different Models for Different Tasks</h3>
+      <p>Your summarizer doesn't need the same model as your reasoner. A well-prompted smaller model often beats a poorly-prompted frontier model. Mix and match.</p>
+    </div>
+  </div>
+
+  <!-- ============ SLIDE 15: AI Product vs AI Feature ============ -->
+  <div class="slide" data-slide="13" data-notes="Before you write a single line of code — decide which one of these you're building.
+
+⤵ Expand left card — AI IS the product:
+The whole app IS the AI. Chatbots, generators, tutors.
+Your job: prompt quality, conversation flow, response speed.
+
+⤵ Expand right card — AI is a FEATURE:
+You have a real app. AI makes it smarter. Dashboards, search, automation.
+Your job: integration, fallbacks, consistent UX.
+
+💡 NUGGETS:
+• AI-as-product needs streaming — users won't stare at a spinner for 5 seconds. Use stream=True and render token-by-token.
+• AI-as-feature needs graceful degradation — what happens when API is slow, down, or returns garbage? Always have a fallback: cached results, loading state, or manual path.
+• For demos: AI-as-product demos itself. AI-as-feature needs a clear before/after — show the app WITHOUT AI, then WITH. That contrast sells it.
+
+Most hackathon projects are clearly one or the other.
+This shapes your architecture, your UI, your error handling, and your demo.
+
+~2 min">
+    <h2 class="animate-in">AI <span class="glow-text">Product</span> vs. AI <span class="cyan-text">Feature</span></h2>
+    <p class="subtitle animate-in" style="margin-bottom: 14px;">This changes your architecture, UI, error handling,<br>and demo strategy.</p>
+    <div class="cards cards-2 animate-in">
+      <div class="card">
+        <h3>AI IS the Product</h3>
+        <p>The entire UX is the AI interaction. The AI is front and center.</p>
+        <ul>
+          <li>AI chatbot / assistant</li>
+          <li>Content generation tool</li>
+          <li>AI tutor or coach</li>
+        </ul>
+        <p style="margin-top: 12px; color: var(--accent); font-size: 0.85rem; font-weight: 600;">Focus: prompt quality, conversation design, response speed</p>
+      </div>
+      <div class="card">
+        <h3 style="color: var(--cyan);">AI is a Feature</h3>
+        <p>A traditional app enhanced with AI capabilities. AI works behind the scenes.</p>
+        <ul>
+          <li>Dashboard with AI-generated insights</li>
+          <li>App with smart search / recommendations</li>
+          <li>Workflow tool with AI automation</li>
+        </ul>
+        <p style="margin-top: 12px; color: var(--cyan); font-size: 0.85rem; font-weight: 600;">Focus: integration quality, graceful fallbacks, UX consistency</p>
+      </div>
+    </div>
+    <p class="aside animate-in" style="text-align: center; margin-top: 12px;">Decide which one you're building before writing code. It shapes every decision that follows.</p>
+  </div>
+
+  <!-- ============ SLIDE 16: AI System Design Patterns ============ -->
+  <div class="slide" data-slide="14" data-notes="This is your cheat sheet.
+
+⤵ Expand the three core cards:
+
+Building Q&amp;A over docs? → RAG + Chat.
+Building a conversational app? → Chat + Memory.
+Building a content tool? → Prompting + Structured Output.
+
+Pick ONE. Get it working.
+
+The bottom row — tool use, multimodal, agents — those are extensions.
+Layer them in only if you need them.
+Agents in particular — skip for the hackathon unless you're experienced.
+
+💡 NUGGETS:
+• Eval-driven development: before building, write 10-15 test cases — input/expected output pairs. Run your prompt against them after every change. This is your test suite. Without it you're guessing.
+• Multimodal is simpler than you think — Claude and GPT-4o accept images directly in the messages array. Base64 encode and send. Great for receipt scanning, diagram analysis, screenshot parsing.
+• If you DO try agents: cap the loop at 5-10 iterations max. Runaway agents burn tokens and produce garbage. Always have a circuit breaker.
+
+★ Start with one pattern. Ship it working. Add complexity later.
+
+
+🔴 DEMO — Spacer: Multiple Patterns Combined
+Show the CMA agent graph (LangGraph):
+identify_subject → recall_similar → search_comps → evaluate → adjust → synthesize → critique → [retry or done]
+
+This is a real agent loop — with a critique step that can send it back for more comps.
+Three HITL modes: guided (pauses at each step), confirm_comps (asks approval), autonomous (runs to completion).
+
+&quot;This is the advanced end of the spectrum. You don't need this for the hackathon — but this is where these patterns lead when you combine them.&quot;
+
+★ Point back to the cheat sheet: Spacer uses RAG + Chat + Memory + Tool Use + Agents. But each feature started as ONE pattern, then layered up.
+~1 min">
+    <h2 class="animate-in">AI System <span class="glow-text">Design Patterns</span></h2>
+    <p class="subtitle animate-in" style="margin-bottom: 16px;">One primary pattern per project.<br>Extend only when needed.</p>
+
+    <!-- Core Patterns -->
+    <p class="animate-in" style="font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.12em; color: var(--accent-bright); font-family: 'JetBrains Mono', monospace; margin-bottom: 10px; font-weight: 600;">Pick one core pattern</p>
+    <div class="cards cards-3 animate-in" style="margin-bottom: 16px;">
+      <div class="card" style="padding: 18px; text-align: center; border-color: rgba(96,165,250,0.25);">
+        <h3 style="color: var(--cyan); font-size: 1.05rem; margin-bottom: 8px;">Answer questions about data</h3>
+        <p><strong style="color: var(--text-primary);">RAG</strong> + Chat</p>
+        <p style="font-size: 0.85rem; color: var(--text-muted); margin-top: 6px;">Q&amp;A over docs, knowledge bases</p>
+      </div>
+      <div class="card" style="padding: 18px; text-align: center; border-color: rgba(74,222,128,0.25);">
+        <h3 style="color: var(--green); font-size: 1.05rem; margin-bottom: 8px;">Have a conversation</h3>
+        <p><strong style="color: var(--text-primary);">Chat</strong> + Memory</p>
+        <p style="font-size: 0.85rem; color: var(--text-muted); margin-top: 6px;">Assistants, tutors, support bots</p>
+      </div>
+      <div class="card" style="padding: 18px; text-align: center; border-color: rgba(129,140,248,0.25);">
+        <h3 style="color: var(--accent-bright); font-size: 1.05rem; margin-bottom: 8px;">Generate content</h3>
+        <p><strong style="color: var(--text-primary);">Prompting</strong> + Structured Output</p>
+        <p style="font-size: 0.85rem; color: var(--text-muted); margin-top: 6px;">Copy, summaries, reports, code</p>
+      </div>
+    </div>
+
+    <!-- Extensions -->
+    <p class="animate-in" style="font-size: 0.82rem; text-transform: uppercase; letter-spacing: 0.12em; color: var(--text-secondary); font-family: 'JetBrains Mono', monospace; margin-bottom: 10px;">+ Layer extensions as needed</p>
+    <div class="animate-in" style="display: flex; gap: 14px; justify-content: center; flex-wrap: wrap; max-width: 900px;">
+      <div style="background: var(--bg-card); border: 1px solid rgba(192,132,252,0.15); border-radius: 10px; padding: 12px 20px; text-align: center; min-width: 160px;">
+        <p style="color: var(--warn); font-size: 0.9rem; font-weight: 600; margin-bottom: 4px;">Tool Use</p>
+        <p style="font-size: 0.85rem;">Let the AI take actions</p>
+      </div>
+      <div style="background: var(--bg-card); border: 1px solid rgba(248,113,113,0.15); border-radius: 10px; padding: 12px 20px; text-align: center; min-width: 160px;">
+        <p style="color: var(--red); font-size: 0.9rem; font-weight: 600; margin-bottom: 4px;">Multimodal</p>
+        <p style="font-size: 0.85rem;">Analyze images / docs</p>
+      </div>
+      <div style="background: var(--bg-card); border: 1px solid rgba(192,132,252,0.08); border-radius: 10px; padding: 12px 20px; text-align: center; min-width: 160px; opacity: 0.7;">
+        <p style="color: var(--text-muted); font-size: 0.9rem; font-weight: 600; margin-bottom: 4px;">Agents <span style="font-size: 0.75rem; opacity: 0.7;">(advanced)</span></p>
+        <p style="font-size: 0.85rem;">Multi-step automation</p>
+      </div>
+    </div>
+
+
+  </div>
+
+  <!-- ============ SLIDE 16: Closing ============ -->
+  <div class="slide" data-slide="15" id="closing-slide" data-notes="[BRING THE ENERGY]
+
+That's the talk.
+
+You don't need to master all of this.
+You need to understand enough to make a good call on architecture and start building.
+
+★ Recap — hit each point quickly:
+Tokens. Context window. Prompting. RAG. Tools.
+Start simple. Ship it working.
+
+💡 PARTING ADVICE:
+• Spend the first hour getting a basic API call working end-to-end. Don't start with a framework — start with the raw call.
+• Your prompt IS your product logic. Version control it. Iterate on it. Treat it like code.
+• When something breaks, check the obvious first: did you hit the context limit? Is the prompt ambiguous? Is retrieval returning garbage? It's almost never a model bug.
+
+QR code on screen — join the Slack if you haven't.
+
+Now go build something.
+I'll be walking around as a mentor — grab me anytime.
+
+Let's have a great hackathon.
+
+~1 min">
+    <canvas id="confetti-canvas" style="position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:0;"></canvas>
+    <h1 class="animate-in" style="color: #cfffcf; text-shadow: 0 0 30px rgba(0,255,65,0.3);">You know enough to start.</h1>
+    <div class="divider animate-in" style="background: linear-gradient(90deg, #00ff41, #00cc33); box-shadow: 0 0 12px rgba(0,255,65,0.3);"></div>
+    <p class="subtitle animate-in" style="max-width: 750px; line-height: 1.7; color: #6fbf7f;">
+      You don't need to understand everything — you need to understand enough to make good decisions and build something real.
+    </p>
+    <div class="highlight-box animate-in" style="margin-top: 24px; background: #0e1a12; border-color: rgba(0,255,65,0.2);">
+      <h3 style="color: #00ff41; text-shadow: 0 0 12px rgba(0,255,65,0.2);">Quick Recap</h3>
+      <p style="color: #6fbf7f;">LLMs predict tokens. The context window is your constraint. Prompting is your highest-ROI skill. RAG gives the model your data. Tools let it take actions. Test with 15 golden examples. Start simple. Ship it working.</p>
+    </div>
+    <div class="qr-section animate-in" style="margin-top: 18px; border-color: rgba(0,255,65,0.12);">
+      <img src="https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=https://join.slack.com/t/promptengineersai/shared_invite/zt-21upjsftv-gX~gNjTCU~2HfbeM_ZwTEQ&bgcolor=ffffff&color=000000" alt="Slack QR Code" />
+      <div>
+        <h3 style="color: #00ff41;">Join the Slack</h3>
+        <p style="color: #6fbf7f;">Connect with your team, mentors, and the community.</p>
+        <code style="color: #00cc33;">promptengineersai.slack.com</code>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- Presenter notes panel (visible only in presenter mode) -->
+<div class="presenter-notes" id="presenter-notes">
+  <div class="notes-drag-handle" id="notes-drag-handle"></div>
+  <div class="notes-header">
+    <span class="notes-label">Speaker Notes</span>
+    <div class="notes-nav">
+      <button class="notes-collapse-btn" id="notes-collapse-btn" onclick="toggleNotesCollapse()">▼</button>
+      <button onclick="prevSlide()">&#8592; Prev</button>
+      <span class="notes-slide-num" id="notes-counter">1 / 16</span>
+      <button onclick="nextSlide()">Next &#8594;</button>
+    </div>
+  </div>
+  <div class="notes-body" id="notes-body">Press <kbd style="background:#1a1f35;padding:2px 8px;border-radius:4px;border:1px solid rgba(129,140,248,0.2);font-family:'JetBrains Mono',monospace;font-size:0.85rem;">P</kbd> to open presenter mode</div>
+</div>
+
+<div class="expand-scrim" id="expand-scrim" onclick="collapseExpanded()"></div>
+<div id="expanded-container"></div>
+<div class="attention-overlay" id="pipeline-tokenize" onclick="collapseExpanded()">
+  <h3 style="font-size: 1.1rem; color: var(--green); margin-bottom: 14px;">How Tokenization Works</h3>
+  <p style="font-size: 0.95rem; margin-bottom: 16px; color: var(--text-secondary); line-height: 1.6;">Text is broken into small units (tokens) and converted into vectors the model can process.</p>
+  <div style="font-family: 'JetBrains Mono', monospace; font-size: 0.9rem; color: var(--text-secondary); line-height: 2.2;">
+    <span style="color: var(--green);">1.</span> Split text into tokens<br>
+    <span style="color: var(--text-muted); margin-left: 18px; display: inline-block;">"The cat sat" &#8594; [<span style="color: var(--accent-bright);">"The"</span>, <span style="color: var(--accent-bright);">"cat"</span>, <span style="color: var(--accent-bright);">"sat"</span>]</span><br>
+    <span style="color: var(--green);">2.</span> Convert tokens &#8594; IDs &#8594; vectors<br>
+    <span style="color: var(--text-muted); margin-left: 18px; display: inline-block;">Each token maps to a number, then to a high-dimensional vector</span><br>
+    <span style="color: var(--green);">3.</span> Position is encoded<br>
+    <span style="color: var(--text-muted); margin-left: 18px; display: inline-block;">Order matters: "cat sat" &#8800; "sat cat"</span>
+  </div>
+  <p style="font-size: 0.85rem; color: var(--green); margin-top: 16px; font-style: italic;">Text &#8594; numbers. Everything after this is vector operations.</p>
+</div>
+
+<div class="attention-overlay" id="pipeline-attention" onclick="collapseExpanded()">
+  <h3 style="font-size: 1.1rem; color: var(--cyan); margin-bottom: 14px;">How Attention Works</h3>
+  <p style="font-size: 0.95rem; margin-bottom: 16px; color: var(--text-secondary); line-height: 1.6;">Each token computes a relevance score against every other token, assigns weights, and blends their information.</p>
+  <div style="font-family: 'JetBrains Mono', monospace; font-size: 0.9rem; color: var(--text-secondary); line-height: 2.2;">
+    <span style="color: var(--cyan);">1.</span> <span style="color: var(--accent-bright);">"cat"</span> compares itself to <span style="color: var(--accent-bright);">"The"</span>, <span style="color: var(--accent-bright);">"sat"</span>, <span style="color: var(--accent-bright);">"on"</span> &nbsp; <span style="color: var(--text-muted);">&#8594; similarity scores</span><br>
+    <span style="color: var(--cyan);">2.</span> Scores become weights: [0.1, <span style="color: var(--green); font-weight: 600;">0.8</span>, 0.1] &nbsp; <span style="color: var(--text-muted);">&#8594; "80% attention on 'sat'"</span><br>
+    <span style="color: var(--cyan);">3.</span> New representation = weighted blend of all tokens
+  </div>
+  <p style="font-size: 0.85rem; color: var(--cyan); margin-top: 16px; font-style: italic;">What matters? This is how context flows between tokens.</p>
+</div>
+
+<div class="attention-overlay" id="pipeline-compute" onclick="collapseExpanded()">
+  <h3 style="font-size: 1.1rem; color: var(--accent); margin-bottom: 14px;">How Compute Works</h3>
+  <p style="font-size: 0.95rem; margin-bottom: 16px; color: var(--text-secondary); line-height: 1.6;">The model transforms token representations into next-token probabilities through stacked layers.</p>
+  <div style="font-family: 'JetBrains Mono', monospace; font-size: 0.9rem; color: var(--text-secondary); line-height: 2.2;">
+    <span style="color: var(--accent);">1.</span> Apply transformer layers<br>
+    <span style="color: var(--text-muted); margin-left: 18px; display: inline-block;">Attention + feedforward layers repeatedly refine representations</span><br>
+    <span style="color: var(--accent);">2.</span> Build contextual understanding<br>
+    <span style="color: var(--text-muted); margin-left: 18px; display: inline-block;">Each token now encodes meaning from the entire sequence</span><br>
+    <span style="color: var(--accent);">3.</span> Output probabilities<br>
+    <span style="color: var(--text-muted); margin-left: 18px; display: inline-block;">Final layer produces likelihoods for every possible next token</span>
+  </div>
+  <p style="font-size: 0.85rem; color: var(--accent); margin-top: 16px; font-style: italic;">Transform meaning. "Reasoning" emerges from repeated transformations, not logic rules.</p>
+</div>
+
+<div class="attention-overlay" id="pipeline-sample" onclick="collapseExpanded()">
+  <h3 style="font-size: 1.1rem; color: var(--warn); margin-bottom: 14px;">How Sampling Works</h3>
+  <p style="font-size: 0.95rem; margin-bottom: 16px; color: var(--text-secondary); line-height: 1.6;">The model selects the next token from a probability distribution.</p>
+  <div style="font-family: 'JetBrains Mono', monospace; font-size: 0.9rem; color: var(--text-secondary); line-height: 2.2;">
+    <span style="color: var(--warn);">1.</span> Start with probabilities<br>
+    <span style="color: var(--text-muted); margin-left: 18px; display: inline-block;">[<span style="color: var(--accent-bright);">"sat"</span>: <span style="color: var(--green);">0.6</span>, <span style="color: var(--accent-bright);">"ran"</span>: 0.3, <span style="color: var(--accent-bright);">"slept"</span>: 0.1]</span><br>
+    <span style="color: var(--warn);">2.</span> Apply sampling strategy<br>
+    <span style="color: var(--text-muted); margin-left: 18px; display: inline-block;">Greedy &#8594; pick highest &nbsp;|&nbsp; Temperature &#8594; add randomness &nbsp;|&nbsp; Top-k &#8594; limit choices</span><br>
+    <span style="color: var(--warn);">3.</span> Choose and append<br>
+    <span style="color: var(--text-muted); margin-left: 18px; display: inline-block;">One token is selected and added to the sequence</span>
+  </div>
+  <p style="font-size: 0.85rem; color: var(--warn); margin-top: 16px; font-style: italic;">Choose next step. Same input can produce different outputs — behavior is controlled, not fixed.</p>
+</div>
+
+<div class="attention-overlay" id="pipeline-repeat" onclick="collapseExpanded()">
+  <h3 style="font-size: 1.1rem; color: var(--cyan); margin-bottom: 14px;">The Generation Loop</h3>
+  <p style="font-size: 0.95rem; margin-bottom: 16px; color: var(--text-secondary); line-height: 1.6;">The entire pipeline runs once per token. A 500-word response is ~700 iterations of this loop.</p>
+  <div style="font-family: 'JetBrains Mono', monospace; font-size: 0.9rem; color: var(--text-secondary); line-height: 2.2;">
+    <span style="color: var(--cyan);">1.</span> New token is appended to input sequence<br>
+    <span style="color: var(--cyan);">2.</span> Attention + Compute + Sample runs again<br>
+    <span style="color: var(--cyan);">3.</span> Stop when model produces an end-of-sequence token
+  </div>
+  <p style="font-size: 0.85rem; color: var(--text-muted); margin-top: 16px;">This is why longer responses cost more (more tokens = more compute) and why streaming works token-by-token.</p>
+</div>
+
+<div class="attention-overlay" id="pipeline-tool-define" onclick="collapseExpanded()">
+  <div style="font-family: 'JetBrains Mono', monospace; font-size: 0.9rem; color: var(--text-secondary); line-height: 1.9;">
+    <span style="color: var(--text-muted);"># define each tool as a dict — model reads these to</span><br>
+    <span style="color: var(--text-muted);"># know what it can request (e.g. weather_tool, search_tool)</span><br><br>
+    weather_tool = {<br>
+    &nbsp;&nbsp;<span style="color: #818cf8;">'name'</span>: <span style="color: #86efac;">'get_weather'</span>,&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span style="color: var(--text-muted);"># what the model calls it</span><br>
+    &nbsp;&nbsp;<span style="color: #818cf8;">'description'</span>: <span style="color: #86efac;">'Get current weather'</span>, <span style="color: var(--text-muted);"># helps model decide when to use it</span><br>
+    &nbsp;&nbsp;<span style="color: #818cf8;">'input_schema'</span>: {&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span style="color: var(--text-muted);"># what inputs it accepts</span><br>
+    &nbsp;&nbsp;&nbsp;&nbsp;<span style="color: #818cf8;">'type'</span>: <span style="color: #86efac;">'object'</span>,<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;<span style="color: #818cf8;">'properties'</span>: {<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span style="color: #818cf8;">'city'</span>: {<span style="color: #818cf8;">'type'</span>: <span style="color: #86efac;">'string'</span>}&nbsp;&nbsp;&nbsp;&nbsp;<span style="color: var(--text-muted);"># one required input: city name</span><br>
+    &nbsp;&nbsp;&nbsp;&nbsp;}<br>
+    &nbsp;&nbsp;}<br>
+    }
+  </div>
+</div>
+
+<div class="attention-overlay" id="pipeline-tool-use" onclick="collapseExpanded()">
+  <div style="font-family: 'JetBrains Mono', monospace; font-size: 0.9rem; color: var(--text-secondary); line-height: 1.9;">
+    <span style="color: var(--text-muted);"># Step 1: send tools + user message to the model</span><br>
+    response = client.messages.<span style="color: #60a5fa;">create</span>(<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;<span style="color: #818cf8;">model</span>=<span style="color: #86efac;">'claude-sonnet-4-20250514'</span>,<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;<span style="color: #818cf8;">max_tokens</span>=<span style="color: #fbbf24;">1024</span>,<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;<span style="color: #818cf8;">tools</span>=[weather_tool, search_tool],<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;<span style="color: #818cf8;">messages</span>=[{<span style="color: #86efac;">'role'</span>: <span style="color: #86efac;">'user'</span>,<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span style="color: #86efac;">'content'</span>: <span style="color: #86efac;">'Weather in Dallas?'</span>}]<br>
+    )<br><br>
+    <span style="color: var(--text-muted);"># Step 2: model responds with a tool request</span><br>
+    <span style="color: var(--text-muted);"># response contains: name='get_weather', input={'city': 'Dallas'}</span><br><br>
+    <span style="color: var(--text-muted);"># Step 3: YOUR code executes the actual function</span><br>
+    result = get_weather_from_api(<span style="color: #86efac;">'Dallas'</span>)&nbsp;&nbsp;<span style="color: var(--text-muted);"># you write this</span><br><br>
+    <span style="color: var(--text-muted);"># Step 4: send the result back to the model</span><br>
+    <span style="color: var(--text-muted);"># model formats it into a natural language response</span>
+  </div>
+</div>
+
+<div class="attention-overlay" id="pipeline-mem-buffer" onclick="collapseExpanded()">
+  <div style="font-family: 'JetBrains Mono', monospace; font-size: 0.9rem; color: var(--text-secondary); line-height: 1.9;">
+    history = []  <span style="color: var(--text-muted);"># empty list — you manage state</span><br><br>
+    <span style="color: var(--text-muted);"># each turn: add user msg, send all, save response</span><br>
+    history.append({<span style="color: #86efac;">'role'</span>: <span style="color: #86efac;">'user'</span>, ...})<br>
+    resp = client.messages.<span style="color: #60a5fa;">create</span>(<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;<span style="color: #818cf8;">model</span>=<span style="color: #86efac;">'claude-sonnet-4-20250514'</span>,<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;<span style="color: #818cf8;">max_tokens</span>=<span style="color: #fbbf24;">1024</span>,<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;<span style="color: #818cf8;">messages</span>=history  <span style="color: var(--text-muted);"># grows: [user, asst, user, asst, ...]</span><br>
+    )<br>
+    history.append({<span style="color: #86efac;">'role'</span>: <span style="color: #86efac;">'assistant'</span>, ...})
+  </div>
+</div>
+
+<div class="attention-overlay" id="pipeline-mem-summary" onclick="collapseExpanded()">
+  <div style="font-family: 'JetBrains Mono', monospace; font-size: 0.9rem; color: var(--text-secondary); line-height: 1.9;">
+    <span style="color: var(--text-muted);"># when history gets long, ask LLM to compress it</span><br>
+    summary = client.messages.<span style="color: #60a5fa;">create</span>(<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;<span style="color: #818cf8;">model</span>=<span style="color: #86efac;">'claude-sonnet-4-20250514'</span>,<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;<span style="color: #818cf8;">max_tokens</span>=<span style="color: #fbbf24;">1024</span>,<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;<span style="color: #818cf8;">system</span>=<span style="color: #86efac;">'Summarize this conversation'</span>,<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;<span style="color: #818cf8;">messages</span>=old_messages<br>
+    ).content[<span style="color: #fbbf24;">0</span>].text  <span style="color: var(--text-muted);"># returns summary string → cache it</span><br><br>
+    <span style="color: var(--text-muted);"># future calls use summary instead of full history</span><br>
+    resp = client.messages.<span style="color: #60a5fa;">create</span>(<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;<span style="color: #818cf8;">model</span>=<span style="color: #86efac;">'claude-sonnet-4-20250514'</span>,<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;<span style="color: #818cf8;">max_tokens</span>=<span style="color: #fbbf24;">1024</span>,<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;<span style="color: #818cf8;">system</span>=summary,          <span style="color: var(--text-muted);"># compressed past</span><br>
+    &nbsp;&nbsp;&nbsp;&nbsp;<span style="color: #818cf8;">messages</span>=recent_messages  <span style="color: var(--text-muted);"># raw recent</span><br>
+    )
+  </div>
+</div>
+
+<div class="attention-overlay" id="pipeline-mem-vector" onclick="collapseExpanded()">
+  <div style="font-family: 'JetBrains Mono', monospace; font-size: 0.9rem; color: var(--text-secondary); line-height: 1.9;">
+    <span style="color: var(--text-muted);"># at ingest: embed each turn, store in vector db</span><br>
+    <span style="color: #c084fc;">for</span> msg <span style="color: #c084fc;">in</span> history:<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;vector = <span style="color: #60a5fa;">embed</span>(msg[<span style="color: #86efac;">'content'</span>])<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;vector_db.<span style="color: #60a5fa;">store</span>(vector, msg)<br><br>
+    <span style="color: var(--text-muted);"># embed query, find top 5 matches → relevant</span><br>
+    relevant = vector_db.<span style="color: #60a5fa;">query</span>(<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;<span style="color: #60a5fa;">embed</span>(user_input), top_k=<span style="color: #fbbf24;">5</span><br>
+    )<br>
+    resp = client.messages.<span style="color: #60a5fa;">create</span>(<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;<span style="color: #818cf8;">model</span>=<span style="color: #86efac;">'claude-sonnet-4-20250514'</span>,<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;<span style="color: #818cf8;">max_tokens</span>=<span style="color: #fbbf24;">1024</span>,<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;<span style="color: #818cf8;">messages</span>=relevant + [{<span style="color: #86efac;">'role'</span>: <span style="color: #86efac;">'user'</span>, ...}]<br>
+    )
+  </div>
+</div>
+
+<div class="attention-overlay" id="pipeline-mem-structured" onclick="collapseExpanded()">
+  <div style="font-family: 'JetBrains Mono', monospace; font-size: 0.9rem; color: var(--text-secondary); line-height: 1.9;">
+    schema = {<span style="color: #86efac;">'preferences'</span>: [], <span style="color: #86efac;">'goals'</span>: [], <span style="color: #86efac;">'decisions'</span>: []}<br><br>
+    <span style="color: var(--text-muted);"># ask LLM to extract facts matching schema</span><br>
+    facts = client.messages.<span style="color: #60a5fa;">create</span>(<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;<span style="color: #818cf8;">model</span>=<span style="color: #86efac;">'claude-sonnet-4-20250514'</span>,<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;<span style="color: #818cf8;">max_tokens</span>=<span style="color: #fbbf24;">1024</span>,<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;<span style="color: #818cf8;">system</span>=f<span style="color: #86efac;">'Extract facts as JSON: {schema}'</span>,<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;<span style="color: #818cf8;">messages</span>=recent<br>
+    ).content[<span style="color: #fbbf24;">0</span>].text<br>
+    db.<span style="color: #60a5fa;">save</span>(json.<span style="color: #60a5fa;">loads</span>(facts))  <span style="color: var(--text-muted);"># JSON string → dict → database</span><br><br>
+    <span style="color: var(--text-muted);"># later: pull specific facts back into prompt</span><br>
+    prefs = db.<span style="color: #60a5fa;">query</span>(<span style="color: #86efac;">'preferences'</span>)<br>
+    resp = client.messages.<span style="color: #60a5fa;">create</span>(<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;<span style="color: #818cf8;">model</span>=<span style="color: #86efac;">'claude-sonnet-4-20250514'</span>,<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;<span style="color: #818cf8;">max_tokens</span>=<span style="color: #fbbf24;">1024</span>,<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;<span style="color: #818cf8;">system</span>=f<span style="color: #86efac;">'User prefs: {prefs}'</span>,<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;<span style="color: #818cf8;">messages</span>=[{<span style="color: #86efac;">'role'</span>: <span style="color: #86efac;">'user'</span>, ...}]<br>
+    )
+  </div>
+</div>
+
+<div class="attention-overlay" id="pipeline-freetext" onclick="collapseExpanded()">
+  <div style="font-family: 'JetBrains Mono', monospace; font-size: 0.9rem; color: var(--text-secondary); line-height: 1.9;">
+    <span style="color: #c084fc;">import</span> anthropic<br><br>
+    client = anthropic.<span style="color: #60a5fa;">Anthropic</span>()<br>
+    response = client.messages.<span style="color: #60a5fa;">create</span>(<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;<span style="color: #818cf8;">model</span>=<span style="color: #86efac;">'claude-sonnet-4-20250514'</span>,<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;<span style="color: #818cf8;">max_tokens</span>=<span style="color: #fbbf24;">1024</span>,<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;<span style="color: #818cf8;">messages</span>=[{<span style="color: #86efac;">'role'</span>: <span style="color: #86efac;">'user'</span>,<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span style="color: #86efac;">'content'</span>: <span style="color: #86efac;">'Review wireless earbuds'</span>}]<br>
+    )<br>
+    <span style="color: #60a5fa;">print</span>(response.content[<span style="color: #fbbf24;">0</span>].text)
+  </div>
+</div>
+
+<div class="attention-overlay" id="pipeline-structured" onclick="collapseExpanded()">
+  <div style="font-family: 'JetBrains Mono', monospace; font-size: 0.9rem; color: var(--text-secondary); line-height: 1.9;">
+    <span style="color: #c084fc;">import</span> anthropic, json, re<br><br>
+    client = anthropic.<span style="color: #60a5fa;">Anthropic</span>()<br>
+    response = client.messages.<span style="color: #60a5fa;">create</span>(<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;<span style="color: #818cf8;">model</span>=<span style="color: #86efac;">'claude-sonnet-4-20250514'</span>,<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;<span style="color: #818cf8;">max_tokens</span>=<span style="color: #fbbf24;">1024</span>,<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;<span style="color: #818cf8;">system</span>=<span style="color: #86efac;">'Respond ONLY with valid JSON.'</span>,<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;<span style="color: #818cf8;">messages</span>=[{<span style="color: #86efac;">'role'</span>: <span style="color: #86efac;">'user'</span>,<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span style="color: #86efac;">'content'</span>: <span style="color: #86efac;">'Review wireless earbuds'</span>}]<br>
+    )<br><br>
+    raw = response.content[<span style="color: #fbbf24;">0</span>].text<br>
+    clean = re.sub(r<span style="color: #86efac;">'^[^{]*'</span>, <span style="color: #86efac;">''</span>,<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;re.sub(r<span style="color: #86efac;">'[^}]*$'</span>, <span style="color: #86efac;">''</span>, raw))<br>
+    data = json.<span style="color: #60a5fa;">loads</span>(clean)<br>
+    <span style="color: #60a5fa;">print</span>(json.dumps(data, indent=<span style="color: #fbbf24;">2</span>))
+  </div>
+</div>
+
+<div class="attention-overlay" id="pipeline-rag-query" onclick="collapseExpanded()">
+  <h3 style="font-size: 1.1rem; color: var(--text-primary); margin-bottom: 14px;">1. Query</h3>
+  <p style="font-size: 0.95rem; margin-bottom: 16px; color: var(--text-secondary); line-height: 1.6;">The user asks a natural language question. This is the only human input in the pipeline.</p>
+  <div style="font-family: 'JetBrains Mono', monospace; font-size: 0.9rem; color: var(--text-secondary); line-height: 2.2;">
+    <span style="color: var(--accent-bright);">"How do I reset my password?"</span>
+  </div>
+  <p style="font-size: 0.85rem; color: var(--text-muted); margin-top: 16px;">This raw text gets passed to the embedding model in the next step.</p>
+</div>
+
+<div class="attention-overlay" id="pipeline-rag-embed" onclick="collapseExpanded()">
+  <h3 style="font-size: 1.1rem; color: var(--cyan); margin-bottom: 14px;">2. Embed</h3>
+  <p style="font-size: 0.95rem; margin-bottom: 16px; color: var(--text-secondary); line-height: 1.6;">The query is converted into a vector — same embedding process as your pre-stored docs.</p>
+  <div style="font-family: 'JetBrains Mono', monospace; font-size: 0.9rem; color: var(--text-secondary); line-height: 2.2;">
+    <span style="color: var(--accent-bright);">"How do I reset my password?"</span><br>
+    <span style="color: var(--text-muted);">&#8594;</span> [0.39, -0.71, 0.12, ...]
+  </div>
+  <p style="font-size: 0.85rem; color: var(--cyan); margin-top: 16px; font-style: italic;">Your docs were embedded the same way at ingest time. Now both are in the same vector space.</p>
+</div>
+
+<div class="attention-overlay" id="pipeline-rag-search" onclick="collapseExpanded()">
+  <h3 style="font-size: 1.1rem; color: var(--green); margin-bottom: 14px;">3. Search (Deterministic)</h3>
+  <p style="font-size: 0.95rem; margin-bottom: 16px; color: var(--text-secondary); line-height: 1.6;">Compare the query vector against every stored doc vector using cosine similarity. Pure math — same query always returns the same results.</p>
+  <div style="font-family: 'JetBrains Mono', monospace; font-size: 0.9rem; color: var(--text-secondary); line-height: 2.0;">
+    <span style="color: var(--text-muted);">Query: [0.39, -0.71, 0.12, ...]</span><br><br>
+    <span style="color: var(--green); font-weight: 600;">0.91</span> <span style="color: var(--green);">&#10003;</span> "Password reset via Settings" &nbsp;<span style="color: var(--text-muted);">[0.41, -0.72, 0.08, ...]</span><br>
+    <span style="color: var(--green); font-weight: 600;">0.87</span> <span style="color: var(--green);">&#10003;</span> "Change your login credentials" &nbsp;<span style="color: var(--text-muted);">[0.38, -0.69, 0.15, ...]</span><br>
+    <span style="color: var(--red); font-weight: 600;">0.23</span> <span style="color: var(--red);">&#10007;</span> <span style="color: var(--text-muted);">"Billing FAQ and payment methods" &nbsp;[-0.55, 0.33, 0.61, ...]</span>
+  </div>
+  <p style="font-size: 0.85rem; color: var(--green); margin-top: 16px; font-style: italic;">No LLM involved here. This is an Information Retrieval (IR) operation.</p>
+</div>
+
+<div class="attention-overlay" id="pipeline-rag-augment" onclick="collapseExpanded()">
+  <h3 style="font-size: 1.1rem; color: var(--green); margin-bottom: 14px;">4. Augment (Deterministic)</h3>
+  <p style="font-size: 0.95rem; margin-bottom: 16px; color: var(--text-secondary); line-height: 1.6;">Take the top matching chunks and inject them into the prompt as context. This is literally string concatenation.</p>
+  <div style="font-family: 'JetBrains Mono', monospace; font-size: 0.9rem; color: var(--text-secondary); line-height: 2.0;">
+    <span style="color: var(--text-muted);"># build the prompt</span><br>
+    <span style="color: var(--accent-bright);">context</span> = top_matches[:3]<br>
+    <span style="color: var(--accent-bright);">prompt</span> = f<span style="color: #86efac;">'Given: {context}\n\nAnswer: {query}'</span>
+  </div>
+  <p style="font-size: 0.85rem; color: var(--green); margin-top: 16px; font-style: italic;">RAG is just: stuff relevant docs into the prompt. That's the whole trick.</p>
+</div>
+
+<div class="attention-overlay" id="pipeline-rag-generate" onclick="collapseExpanded()">
+  <h3 style="font-size: 1.1rem; color: var(--cyan); margin-bottom: 14px;">5. Generate (LLM)</h3>
+  <p style="font-size: 0.95rem; margin-bottom: 16px; color: var(--text-secondary); line-height: 1.6;">The LLM receives the augmented prompt and generates an answer grounded in the retrieved context.</p>
+  <div style="font-family: 'JetBrains Mono', monospace; font-size: 0.9rem; color: var(--text-secondary); line-height: 2.0;">
+    resp = client.messages.<span style="color: #60a5fa;">create</span>(<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;<span style="color: #818cf8;">model</span>=<span style="color: #86efac;">'claude-sonnet-4-20250514'</span>,<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;<span style="color: #818cf8;">max_tokens</span>=<span style="color: #fbbf24;">1024</span>,<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;<span style="color: #818cf8;">system</span>=context, &nbsp;<span style="color: var(--text-muted);"># retrieved docs</span><br>
+    &nbsp;&nbsp;&nbsp;&nbsp;<span style="color: #818cf8;">messages</span>=[{<span style="color: #86efac;">'role'</span>: <span style="color: #86efac;">'user'</span>, ...}]<br>
+    )
+  </div>
+  <p style="font-size: 0.85rem; color: var(--cyan); margin-top: 16px; font-style: italic;">This is the only probabilistic step. Everything before it was deterministic math.</p>
+</div>
+
+<div class="attention-overlay" id="pipeline-agent-plan" onclick="collapseExpanded()">
+  <h3 style="font-size: 1.1rem; color: var(--warn); margin-bottom: 14px;">1. Plan</h3>
+  <p style="font-size: 0.95rem; margin-bottom: 16px; color: var(--text-secondary); line-height: 1.6;">The model receives available tools + conversation history and predicts the next step. Tools can be functions, APIs — or even other agent loops (sub-agents) that run their own cycle internally.</p>
+  <div style="font-family: 'JetBrains Mono', monospace; font-size: 0.9rem; color: var(--text-secondary); line-height: 2.0;">
+    resp = client.messages.<span style="color: #60a5fa;">create</span>(<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;<span style="color: #818cf8;">model</span>=<span style="color: #86efac;">'claude-sonnet-4-20250514'</span>,<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;<span style="color: #818cf8;">max_tokens</span>=<span style="color: #fbbf24;">1024</span>,<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;<span style="color: #818cf8;">tools</span>=[search_tool, calc_tool],<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;<span style="color: #818cf8;">messages</span>=history<br>
+    )<br><br>
+    <span style="color: var(--text-muted);"># resp.content contains blocks:</span><br>
+    <span style="color: var(--text-muted);"># TextBlock → final answer (done)</span><br>
+    <span style="color: var(--text-muted);"># ToolUseBlock → tool request (continue)</span>
+  </div>
+  <p style="font-size: 0.85rem; color: var(--warn); margin-top: 16px; font-style: italic;">At its core: next-token prediction over the tool menu + context. Advanced systems add evaluators, routers, and sub-agents — but this loop is always the foundation.</p>
+</div>
+
+<div class="attention-overlay" id="pipeline-agent-act" onclick="collapseExpanded()">
+  <h3 style="font-size: 1.1rem; color: var(--warn); margin-bottom: 14px;">2. Act</h3>
+  <p style="font-size: 0.95rem; margin-bottom: 16px; color: var(--text-secondary); line-height: 1.6;">Extract the tool request from the response. Your code executes it — the model never runs code, it only generates a structured request.</p>
+  <div style="font-family: 'JetBrains Mono', monospace; font-size: 0.9rem; color: var(--text-secondary); line-height: 2.0;">
+    <span style="color: var(--text-muted);"># extract tool call from response</span><br>
+    tool_block = next(b <span style="color: #c084fc;">for</span> b <span style="color: #c084fc;">in</span> resp.content<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span style="color: #c084fc;">if</span> b.type == <span style="color: #86efac;">'tool_use'</span>)<br><br>
+    <span style="color: var(--text-muted);"># your code runs the actual function</span><br>
+    result = run_tool(<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;tool_block.name, &nbsp;<span style="color: var(--text-muted);"># e.g. 'search'</span><br>
+    &nbsp;&nbsp;&nbsp;&nbsp;tool_block.input &nbsp;<span style="color: var(--text-muted);"># e.g. {'query': 'revenue Q3'}</span><br>
+    )
+  </div>
+  <p style="font-size: 0.85rem; color: var(--warn); margin-top: 16px; font-style: italic;">The safety boundary: the model requests, you execute. Same pattern as single tool use.</p>
+</div>
+
+<div class="attention-overlay" id="pipeline-agent-observe" onclick="collapseExpanded()">
+  <h3 style="font-size: 1.1rem; color: var(--warn); margin-bottom: 14px;">3. Observe</h3>
+  <p style="font-size: 0.95rem; margin-bottom: 16px; color: var(--text-secondary); line-height: 1.6;">Append both the assistant's tool request and the tool result to history. The model sees this on the next call — it has no live awareness. In advanced systems, evaluators (separate LLM calls) can grade the result before continuing.</p>
+  <div style="font-family: 'JetBrains Mono', monospace; font-size: 0.9rem; color: var(--text-secondary); line-height: 2.0;">
+    <span style="color: var(--text-muted);"># 1. record what the model requested</span><br>
+    history.append({<span style="color: #86efac;">'role'</span>: <span style="color: #86efac;">'assistant'</span>,<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;<span style="color: #86efac;">'content'</span>: resp.content})<br><br>
+    <span style="color: var(--text-muted);"># 2. record the tool result</span><br>
+    history.append({<span style="color: #86efac;">'role'</span>: <span style="color: #86efac;">'user'</span>,<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;<span style="color: #86efac;">'content'</span>: [{<span style="color: #86efac;">'type'</span>: <span style="color: #86efac;">'tool_result'</span>,<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span style="color: #86efac;">'tool_use_id'</span>: tool_block.id,<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span style="color: #86efac;">'content'</span>: result}]})<br><br>
+    <span style="color: var(--text-muted);"># optional: evaluator grades before looping</span><br>
+    <span style="color: var(--text-muted);"># grade = evaluate(result)</span>
+  </div>
+  <p style="font-size: 0.85rem; color: var(--warn); margin-top: 16px; font-style: italic;">Both messages required: the assistant's request + the tool's response. Evaluators and sub-agents plug in here as additional LLM calls or nested loops.</p>
+</div>
+
+<div class="attention-overlay" id="pipeline-agent-repeat" onclick="collapseExpanded()">
+  <h3 style="font-size: 1.1rem; color: var(--warn); margin-bottom: 14px;">4. Loop</h3>
+  <p style="font-size: 0.95rem; margin-bottom: 16px; color: var(--text-secondary); line-height: 1.6;">The entire agent is a while loop. If the response contains a tool_use block, keep going. If the model returns only text, it's done.</p>
+  <div style="font-family: 'JetBrains Mono', monospace; font-size: 0.9rem; color: var(--text-secondary); line-height: 2.0;">
+    <span style="color: #c084fc;">while</span> <span style="color: #86efac;">True</span>:<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;resp = client.messages.<span style="color: #60a5fa;">create</span>(<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span style="color: #818cf8;">model</span>=<span style="color: #86efac;">'...'</span>, <span style="color: #818cf8;">tools</span>=tools, <span style="color: #818cf8;">messages</span>=history)<br><br>
+    &nbsp;&nbsp;&nbsp;&nbsp;tool_calls = [b <span style="color: #c084fc;">for</span> b <span style="color: #c084fc;">in</span> resp.content<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span style="color: #c084fc;">if</span> b.type == <span style="color: #86efac;">'tool_use'</span>]<br><br>
+    &nbsp;&nbsp;&nbsp;&nbsp;<span style="color: #c084fc;">if not</span> tool_calls: &nbsp;<span style="color: var(--text-muted);"># text only → done</span><br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span style="color: #c084fc;">break</span><br><br>
+    &nbsp;&nbsp;&nbsp;&nbsp;<span style="color: var(--text-muted);"># act</span><br>
+    &nbsp;&nbsp;&nbsp;&nbsp;history.append({<span style="color: #86efac;">'role'</span>: <span style="color: #86efac;">'assistant'</span>,<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span style="color: #86efac;">'content'</span>: resp.content})<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;<span style="color: #c084fc;">for</span> tool <span style="color: #c084fc;">in</span> tool_calls:<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;result = run_tool(tool.name, tool.input)<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;history.append({<span style="color: #86efac;">'role'</span>: <span style="color: #86efac;">'user'</span>,<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span style="color: #86efac;">'content'</span>: [{<span style="color: #86efac;">'type'</span>: <span style="color: #86efac;">'tool_result'</span>,<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span style="color: #86efac;">'tool_use_id'</span>: tool.id,<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span style="color: #86efac;">'content'</span>: result}]}) <span style="color: var(--text-muted);"># observe</span>
+  </div>
+  <p style="font-size: 0.85rem; color: var(--warn); margin-top: 16px; font-style: italic;">That's the entire agent. A while loop, tool extraction, execution, and history updates. Everything else is a wrapper around this.</p>
+</div>
+
+<!-- Navigation -->
+<div class="nav-bar">
+  <div class="nav-controls">
+    <button class="nav-btn" onclick="prevSlide()" aria-label="Previous">&#8592;</button>
+    <button class="nav-btn" onclick="nextSlide()" aria-label="Next">&#8594;</button>
+    <button class="nav-btn" onclick="togglePresenterMode()" aria-label="Presenter mode" style="margin-left:8px;width:auto;padding:0 10px;font-size:0.72rem;font-family:'JetBrains Mono',monospace;" id="presenter-btn">P</button>
+  </div>
+  <div class="progress-track"><div class="progress-fill" id="progress"></div></div>
+  <span class="slide-counter" id="counter">1 / 16</span>
+</div>
+<div class="key-hint">&#8592; &#8594; Space &middot; F = fullscreen &middot; P = presenter</div>
+
+<script>
+  const slides = document.querySelectorAll('.slide');
+  let current = 0;
+  const total = slides.length;
+
+  function updateSlide(next, direction = 'forward') {
+    if (next < 0 || next >= total || next === current) return;
+    const cur = slides[current], nxt = slides[next];
+    cur.classList.remove('active');
+    if (direction === 'forward') cur.classList.add('exit-up');
+    setTimeout(() => cur.classList.remove('exit-up'), 600);
+    nxt.classList.add('active');
+    current = next;
+    document.getElementById('progress').style.width = ((current) / (total - 1) * 100) + '%';
+    document.getElementById('counter').textContent = (current + 1) + ' / ' + total;
+  }
+
+  function nextSlide() { updateSlide(current + 1, 'forward'); }
+
+  function toggleAttention() {
+    togglePipeline('attention');
+  }
+
+  function togglePipeline(step, _fromSync) {
+    // close any open pipeline overlay first
+    document.querySelectorAll('.attention-overlay.active').forEach(el => el.classList.remove('active'));
+    const overlay = document.getElementById('pipeline-' + step);
+    if (!overlay) return;
+    document.getElementById('expand-scrim').classList.add('active');
+    overlay.classList.add('active');
+    if (!_fromSync && presenterMode) channel.postMessage({ type: 'togglePipeline', step });
+  }
+
+  let expandSourceEl = null;
+
+  function getExpandableIndex(el) {
+    const activeSlide = slides[current];
+    if (!activeSlide) return -1;
+    const all = activeSlide.querySelectorAll('.card, .code-block, .comp-card');
+    return Array.from(all).indexOf(el);
+  }
+
+  function expandElement(el, _fromSync) {
+    if (el.classList.contains('attention-trigger')) return;
+    const idx = _fromSync ? -1 : getExpandableIndex(el);
+    const clone = el.cloneNode(true);
+    clone.classList.add('expanded-clone');
+    clone.style.removeProperty('flex');
+    clone.style.removeProperty('grid-column');
+    clone.style.removeProperty('margin-top');
+    clone.onclick = collapseExpanded;
+    // Prevent inner clicks from re-triggering or closing
+    clone.querySelectorAll('.card, .code-block, .comp-card').forEach(inner => {
+      inner.onclick = (e) => e.stopPropagation();
+    });
+    const container = document.getElementById('expanded-container');
+    container.innerHTML = '';
+    container.appendChild(clone);
+    // Highlight source element on the slide
+    expandSourceEl = el;
+    el.classList.add('expand-source');
+    document.getElementById('expand-scrim').classList.add('active');
+    requestAnimationFrame(() => clone.classList.add('active'));
+    if (!_fromSync && presenterMode && idx >= 0) channel.postMessage({ type: 'expandElement', index: idx });
+  }
+
+  function collapseExpanded(_fromSync) {
+    document.getElementById('expand-scrim').classList.remove('active');
+    document.querySelectorAll('.attention-overlay.active').forEach(el => el.classList.remove('active'));
+    // Remove source highlight
+    if (expandSourceEl) {
+      expandSourceEl.classList.remove('expand-source');
+      expandSourceEl = null;
+    }
+    const container = document.getElementById('expanded-container');
+    const clone = container.querySelector('.expanded-clone');
+    if (clone) {
+      clone.classList.remove('active');
+      setTimeout(() => container.innerHTML = '', 400);
+    }
+    if (!_fromSync && presenterMode) channel.postMessage({ type: 'collapse' });
+  }
+
+  // Attach click-to-expand to all cards, code blocks, comp-cards
+  document.addEventListener('click', (e) => {
+    // Don't expand if clicking inside an already-expanded clone
+    if (e.target.closest('.expanded-clone')) return;
+    // Don't expand pipeline triggers (they have their own overlays)
+    if (e.target.closest('.attention-trigger')) return;
+    // Don't expand nav buttons or tags used for carousel
+    if (e.target.closest('.nav-btn, .mem-dot, [onclick*="showMemPanel"]')) return;
+    const expandable = e.target.closest('.card, .code-block, .comp-card');
+    if (!expandable) return;
+    expandElement(expandable);
+  });
+
+  function showMemPanel(idx, _fromSync) {
+    document.querySelectorAll('.memory-panel').forEach(p => p.classList.remove('active'));
+    document.querySelectorAll('.mem-dot').forEach(d => d.style.opacity = '0.3');
+    document.querySelector('.memory-panel[data-mem="' + idx + '"]').classList.add('active');
+    const dots = document.querySelectorAll('.mem-dot');
+    if (dots[idx]) dots[idx].style.opacity = '1';
+    if (!_fromSync && presenterMode) channel.postMessage({ type: 'showMemPanel', index: idx });
+  }
+  function prevSlide() { updateSlide(current - 1, 'backward'); }
+
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') { collapseExpanded(); return; }
+    if (document.getElementById('expand-scrim').classList.contains('active')) return;
+    if (e.key === 'p' || e.key === 'P') { togglePresenterMode(); return; }
+    if (e.key === 'ArrowRight' || e.key === ' ') { e.preventDefault(); nextSlide(); }
+    else if (e.key === 'ArrowLeft') { e.preventDefault(); prevSlide(); }
+    else if (e.key === 'f' || e.key === 'F') {
+      if (!document.fullscreenElement) document.documentElement.requestFullscreen();
+      else document.exitFullscreen();
+    }
+  });
+
+  let touchStartX = 0;
+  document.addEventListener('touchstart', (e) => { touchStartX = e.touches[0].clientX; });
+  document.addEventListener('touchend', (e) => {
+    const diff = touchStartX - e.changedTouches[0].clientX;
+    if (Math.abs(diff) > 50) diff > 0 ? nextSlide() : prevSlide();
+  });
+
+  document.getElementById('progress').style.width = '0%';
+
+  // Fix z-index stacking: remove animation after it completes
+  document.addEventListener('animationend', (e) => {
+    if (e.target.classList.contains('animate-in') && e.animationName === 'fadeSlideIn') {
+      e.target.classList.add('animate-done');
+    }
+  });
+
+  setTimeout(() => {
+    document.querySelectorAll('.slide.active .animate-in').forEach(el => el.classList.add('animate-done'));
+  }, 800);
+
+  // Rocket launch animation
+  const cCanvas = document.getElementById('confetti-canvas');
+  const ctx = cCanvas.getContext('2d');
+  let particles = [], rockets = [], animRunning = false;
+  const pColors = ['#818cf8','#a5b4fc','#60a5fa','#c084fc','#93c5fd','#e0e8f0'];
+
+  const _origUpdate = updateSlide;
+  updateSlide = function(next, direction) {
+    if (next < 0 || next >= total || next === current) return;
+    slides[current].querySelectorAll('.animate-done').forEach(el => el.classList.remove('animate-done'));
+    _origUpdate(next, direction);
+    if (next === total - 1) setTimeout(initMatrix, 400);
+    else { matrixRunning = false; ctx.clearRect(0, 0, cCanvas.width, cCanvas.height); }
+  };
+
+  function resizeCanvas() { cCanvas.width = cCanvas.offsetWidth; cCanvas.height = cCanvas.offsetHeight; }
+
+  // Matrix digital rain — classic green, slow, persistent, transparent
+  let matrixRunning = false, drops = [], frameCount = 0;
+  const matrixChars = 'アイウエオカキクケコサシスセソタチツテトナニヌネノハヒフヘホマミムメモヤユヨラリルレロワヲン0123456789ABCDEFZ@#$&';
+  const fontSize = 15;
+
+  function initMatrix() {
+    resizeCanvas();
+    const cols = Math.floor(cCanvas.width / fontSize);
+    drops = [];
+    for (let i = 0; i < cols; i++) {
+      drops.push(Math.floor(Math.random() * -80));
+    }
+    frameCount = 0;
+    ctx.clearRect(0, 0, cCanvas.width, cCanvas.height);
+    if (!matrixRunning) { matrixRunning = true; animateMatrix(); }
+  }
+
+  function animateMatrix() {
+    if (!matrixRunning) return;
+    frameCount++;
+
+    // Only update every 5th frame — very slow rain
+    if (frameCount % 5 !== 0) { requestAnimationFrame(animateMatrix); return; }
+
+    // Fade overlay — slow enough to persist but strong enough to fully clear
+    // 0.04 means a character takes ~25 draw cycles to fully disappear
+    // At every-5th-frame rate, that's ~2 seconds of persistence
+    ctx.fillStyle = 'rgba(8, 9, 14, 0.08)';
+    ctx.fillRect(0, 0, cCanvas.width, cCanvas.height);
+
+    ctx.font = fontSize + 'px JetBrains Mono, monospace';
+
+    for (let i = 0; i < drops.length; i++) {
+      const char = matrixChars[Math.floor(Math.random() * matrixChars.length)];
+      const x = i * fontSize;
+      const y = drops[i] * fontSize;
+
+      // Head character — subtle
+      ctx.fillStyle = '#cfffcf';
+      ctx.globalAlpha = 0.18;
+      ctx.fillText(char, x, y);
+
+      // Character just behind head
+      if (drops[i] > 1) {
+        const prevChar = matrixChars[Math.floor(Math.random() * matrixChars.length)];
+        ctx.fillStyle = '#00ff41';
+        ctx.globalAlpha = 0.1;
+        ctx.fillText(prevChar, x, y - fontSize);
+      }
+
+      // Very slow reset
+      if (y > cCanvas.height && Math.random() > 0.995) {
+        drops[i] = Math.floor(Math.random() * -40);
+      }
+
+      drops[i]++;
+    }
+
+    ctx.globalAlpha = 1;
+    requestAnimationFrame(animateMatrix);
+  }
+
+  window.addEventListener('resize', () => { if (matrixRunning) { resizeCanvas(); const cols = Math.floor(cCanvas.width / fontSize); while (drops.length < cols) drops.push(0); drops.length = cols; } });
+
+  // ============ PRESENTER MODE ============
+  // Press P or click the P button. Uses BroadcastChannel to sync a second
+  // browser tab (drag to external monitor) as the audience view.
+
+  const channel = new BroadcastChannel('slide-sync');
+  let audienceWindow = null;
+  let presenterMode = false;
+  // Detect if this tab was opened as the audience view
+  const isAudienceView = new URLSearchParams(window.location.search).has('audience');
+
+  if (isAudienceView) {
+    // Hide nav bar and key hints in audience view
+    document.querySelector('.nav-bar').style.display = 'none';
+    document.querySelector('.key-hint').style.display = 'none';
+    // Listen for all sync messages from presenter
+    channel.onmessage = (e) => {
+      if (!e.data || !e.data.type) return;
+      switch (e.data.type) {
+        case 'goToSlide': {
+          const target = e.data.index;
+          if (target !== current && target >= 0 && target < total) {
+            const cur = slides[current], nxt = slides[target];
+            cur.classList.remove('active');
+            if (target > current) cur.classList.add('exit-up');
+            setTimeout(() => cur.classList.remove('exit-up'), 600);
+            cur.querySelectorAll('.animate-done').forEach(el => el.classList.remove('animate-done'));
+            nxt.classList.add('active');
+            current = target;
+            if (target === total - 1) setTimeout(initMatrix, 400);
+            else { matrixRunning = false; ctx.clearRect(0, 0, cCanvas.width, cCanvas.height); }
+          }
+          break;
+        }
+        case 'togglePipeline':
+          togglePipeline(e.data.step, true);
+          break;
+        case 'expandElement': {
+          const activeSlide = slides[current];
+          if (!activeSlide) break;
+          const all = activeSlide.querySelectorAll('.card, .code-block, .comp-card');
+          const el = all[e.data.index];
+          if (el) expandElement(el, true);
+          break;
+        }
+        case 'collapse':
+          collapseExpanded(true);
+          break;
+        case 'showMemPanel':
+          showMemPanel(e.data.index, true);
+          break;
+      }
+    };
+    // Block keyboard nav in audience view
+    document.addEventListener('keydown', (e) => {
+      if (e.key !== 'f' && e.key !== 'F' && e.key !== 'Escape') e.preventDefault();
+    });
+  }
+
+  function formatNotes(raw) {
+    if (!raw) return '<span style="color:var(--text-muted);">(no notes for this slide)</span>';
+    // Escape HTML, then format
+    let html = raw
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+      // blank lines → section break
+      .replace(/\n\n/g, '\n<div style="height:10px;"></div>\n')
+      // lines starting with 🔴
+      .replace(/^(🔴.*)$/gm, '<div class="notes-demo">$1</div>')
+      // lines starting with 💡
+      .replace(/^(💡.*)$/gm, '<div class="notes-nugget">$1</div>')
+      // lines starting with ★
+      .replace(/^(★.*)$/gm, '<div class="notes-star">$1</div>')
+      // lines starting with ⤵
+      .replace(/^(⤵.*)$/gm, '<div class="notes-expand">$1</div>')
+      // lines starting with [
+      .replace(/^(\[.+\])$/gm, '<div class="notes-cue">$1</div>')
+      // remaining bullet lines
+      .replace(/^(• .*)$/gm, '<div class="notes-bullet">$1</div>')
+      // any remaining newlines
+      .replace(/\n/g, '<br>');
+    return html;
+  }
+
+  function updateNotes() {
+    const notesBody = document.getElementById('notes-body');
+    const notesCounter = document.getElementById('notes-counter');
+    if (!notesBody) return;
+    const activeSlide = slides[current];
+    const notes = activeSlide ? activeSlide.getAttribute('data-notes') : '';
+    notesBody.innerHTML = formatNotes(notes);
+    notesCounter.textContent = (current + 1) + ' / ' + total;
+  }
+
+  function syncAudience() {
+    channel.postMessage({ type: 'goToSlide', index: current });
+  }
+
+  // Patch updateSlide to sync notes + audience
+  const _origUpdate2 = updateSlide;
+  updateSlide = function(next, direction) {
+    _origUpdate2(next, direction);
+    if (presenterMode) {
+      updateNotes();
+      syncAudience();
+    }
+  };
+
+  function togglePresenterMode() {
+    if (isAudienceView) return; // don't toggle in audience tab
+    presenterMode = !presenterMode;
+    document.body.classList.toggle('presenter-mode', presenterMode);
+    const btn = document.getElementById('presenter-btn');
+
+    const deck = document.querySelector('.deck');
+    const panel = document.getElementById('presenter-notes');
+    if (presenterMode) {
+      updateNotes();
+      if (btn) btn.style.color = 'var(--accent)';
+      // Sync deck height to notes panel
+      deck.style.height = '55vh';
+      panel.style.height = '45vh';
+      panel.classList.remove('collapsed');
+      document.getElementById('notes-collapse-btn').textContent = '▼';
+      // Open audience tab — same file with ?audience param
+      const url = window.location.href.split('?')[0] + '?audience';
+      audienceWindow = window.open(url, 'audienceView');
+      // Sync after load
+      setTimeout(() => syncAudience(), 1000);
+    } else {
+      if (btn) btn.style.color = '';
+      deck.style.height = '';
+      if (audienceWindow && !audienceWindow.closed) audienceWindow.close();
+      audienceWindow = null;
+    }
+  }
+
+  // ============ NOTES RESIZE + COLLAPSE ============
+  function toggleNotesCollapse() {
+    const panel = document.getElementById('presenter-notes');
+    const btn = document.getElementById('notes-collapse-btn');
+    const deck = document.querySelector('.deck');
+    panel.classList.toggle('collapsed');
+    if (panel.classList.contains('collapsed')) {
+      btn.textContent = '▲';
+      deck.style.height = 'calc(100vh - 42px)';
+    } else {
+      btn.textContent = '▼';
+      deck.style.height = (100 - (panel.offsetHeight / window.innerHeight * 100)) + 'vh';
+    }
+  }
+
+  // Drag-to-resize
+  (function() {
+    const handle = document.getElementById('notes-drag-handle');
+    const panel = document.getElementById('presenter-notes');
+    let dragging = false;
+
+    handle.addEventListener('mousedown', (e) => {
+      e.preventDefault();
+      dragging = true;
+      handle.classList.add('dragging');
+      panel.style.transition = 'none';
+      document.body.style.cursor = 'ns-resize';
+      document.body.style.userSelect = 'none';
+    });
+
+    document.addEventListener('mousemove', (e) => {
+      if (!dragging) return;
+      const newH = window.innerHeight - e.clientY;
+      const clamped = Math.max(42, Math.min(newH, window.innerHeight * 0.8));
+      panel.style.height = clamped + 'px';
+      panel.classList.remove('collapsed');
+      document.getElementById('notes-collapse-btn').textContent = '▼';
+      document.querySelector('.deck').style.height = (window.innerHeight - clamped) + 'px';
+    });
+
+    document.addEventListener('mouseup', () => {
+      if (!dragging) return;
+      dragging = false;
+      handle.classList.remove('dragging');
+      panel.style.transition = '';
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+    });
+  })();
+
+</script>
+</body>
+</html>
