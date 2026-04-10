@@ -57,7 +57,7 @@ This sounds like a step backward — toward the "kitchen sink" agent of Chapter 
 
 Conversely, you can split a generalist when:
 
-- A clearly distinct intent emerges that has its own tools (e.g., "answering questions" is read-only; "making changes" is writes)
+- A clearly distinct intent emerges that has its own tools (e.g., "answering questions about the home" needs context tools; "searching listings" needs MLS tools — different domains, different tool sets)
 - The generalist's prompt is becoming a forest of conditionals
 - One slice of users only cares about one slice of functionality
 
