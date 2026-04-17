@@ -68,7 +68,7 @@ Each chapter is short — most run 300–700 words, the deeper ones (long-term m
 ### Reference
 
 - [Glossary](./glossary.md) — every term used in the guide, one or two sentences each.
-- [Worked example: a todo agent, end to end](./demos/todo-agent/worked-example.md) — one complete agent built across the load-bearing chapters, ~280 lines of Python you can fork and scaffold.
+- [Worked example: a todo agent, end to end](./worked-example.md) — one complete agent built across the load-bearing chapters, ~280 lines of Python you can fork.
 
 ---
 

@@ -1,0 +1,757 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Routing &amp; HITL — Splitting the Agent</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap');
+
+  :root {
+    --bg: #0f0f13;
+    --surface: #161620;
+    --surface2: #1e1e2e;
+    --accent: #d4a053;
+    --text: #e8e6f0;
+    --text-dim: #8a87a0;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'Inter', -apple-system, sans-serif;
+    background: var(--bg); color: var(--text);
+    overflow: hidden; height: 100vh;
+  }
+
+  .deck { width: 100vw; height: 100vh; position: relative; }
+
+  .slide {
+    position: absolute; inset: 0;
+    display: none; flex-direction: column; justify-content: center;
+    padding: 4.5rem 7rem;
+    opacity: 0; transition: opacity 0.3s ease;
+    overflow: hidden;
+  }
+  .slide.active { display: flex; opacity: 1; }
+
+  h1 { font-size: 3.4rem; font-weight: 800; letter-spacing: -0.03em; line-height: 1.1; }
+  h2 { font-size: 2.6rem; font-weight: 700; letter-spacing: -0.02em; line-height: 1.15; margin-bottom: 1.5rem; }
+  h3 { font-size: 0.85rem; font-weight: 600; color: var(--accent); text-transform: uppercase; letter-spacing: 0.12em; margin-bottom: 0.6rem; }
+
+  p { font-size: 1.3rem; line-height: 1.65; color: var(--text-dim); }
+  p strong { color: var(--text); }
+  .big { font-size: 1.45rem; line-height: 1.55; color: var(--text); max-width: 44rem; }
+  .accent { color: var(--accent); }
+  .dim { color: var(--text-dim); }
+  .red { color: #f87171; }
+  .green { color: #4ade80; }
+
+  code { font-family: 'JetBrains Mono', monospace; background: var(--surface2); padding: 0.12em 0.4em; border-radius: 4px; font-size: 0.85em; }
+  pre {
+    font-family: 'JetBrains Mono', monospace;
+    background: var(--surface); border: 1px solid var(--surface2); border-radius: 10px;
+    padding: 1.4rem 1.6rem; font-size: 1rem; line-height: 1.7;
+    margin: 1rem 0; overflow: hidden; max-width: 52rem;
+  }
+  .hl { background: rgba(212,160,83,0.08); border-radius: 3px; padding: 0.05em 0.2em; }
+
+  .cols { display: grid; grid-template-columns: 1fr 1fr; gap: 3rem; align-items: start; }
+  .cols-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1.6rem; align-items: start; }
+
+  .card {
+    background: var(--surface); border: 1px solid var(--surface2); border-radius: 14px;
+    padding: 1.4rem; display: flex; flex-direction: column; gap: 0.5rem;
+    overflow: hidden; min-width: 0;
+  }
+  .card h3 { margin-bottom: 0; }
+  .card p { font-size: 1rem; }
+
+  .title-slide { text-align: center; align-items: center; }
+  .section-slide { align-items: center; text-align: center; }
+  .section-slide h2 { font-size: 3rem; margin-bottom: 0.75rem; }
+
+  .insight {
+    margin-top: 2rem; padding: 1.2rem 1.5rem;
+    background: var(--surface);
+    border-left: 3px solid var(--accent); border-radius: 0 10px 10px 0;
+    font-size: 1.15rem; line-height: 1.55; max-width: 52rem;
+  }
+  .insight strong { color: var(--text); }
+  .insight code { font-size: 0.82em; }
+
+  table.cmp {
+    border-collapse: collapse; font-size: 1rem; margin-top: 1rem;
+    font-family: 'JetBrains Mono', monospace;
+  }
+  table.cmp th, table.cmp td {
+    padding: 0.55rem 1.1rem; text-align: left;
+    border-bottom: 1px solid var(--surface2);
+  }
+  table.cmp th { color: var(--accent); font-weight: 600; font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.08em; }
+  table.cmp td.num { text-align: right; }
+
+  .progress { position: fixed; bottom: 0; left: 0; height: 3px; background: var(--accent); transition: width 0.3s ease; z-index: 100; }
+  .slide-number { position: fixed; bottom: 0.8rem; right: 1.2rem; font-family: 'JetBrains Mono', monospace; font-size: 0.8rem; color: var(--text-dim); z-index: 100; }
+
+  .cue {
+    margin-top: 1.5rem; padding: 0.6rem 1rem;
+    border: 1px dashed #333; border-radius: 8px;
+    font-size: 0.85rem; color: #555; font-family: 'JetBrains Mono', monospace;
+    max-width: 52rem;
+  }
+  .cue::before { content: 'DEMO → '; color: var(--accent); font-weight: 600; }
+</style>
+</head>
+<body>
+
+<div class="deck" id="deck">
+
+<!-- ====== 1: TITLE ====== -->
+<div class="slide title-slide active">
+  <h3>Mentor Session</h3>
+  <h1 style="margin-bottom:0.75rem">Routing &amp; HITL</h1>
+  <p style="font-size:1.4rem; color:var(--text)">Splitting the agent, and pausing it safely</p>
+  <p style="margin-top:3rem; font-size:1.1rem; color:var(--text)">Derrick Bozkurt &nbsp;&bull;&nbsp; <span class="accent">Prompt Engineers</span></p>
+</div>
+
+<!-- ====== 2: RECAP / THESIS ====== -->
+<div class="slide">
+  <h2>Where we left off</h2>
+  <p class="big">Last time: <strong>tools &amp; state</strong> — how one agent works.</p>
+  <p class="big" style="margin-top:1rem">Today: two decisions that separate a demo from a product.</p>
+  <div style="margin-top:2rem; display:flex; gap:2rem; flex-wrap:wrap;">
+    <div class="card" style="flex:1; min-width:20rem;">
+      <h3>Routing</h3>
+      <p><strong>Who decides which step runs next?</strong></p>
+      <p class="dim" style="font-size:0.95rem">Code? An embedding? An LLM? The agent itself?</p>
+    </div>
+    <div class="card" style="flex:1; min-width:20rem;">
+      <h3>Human-in-the-Loop</h3>
+      <p><strong>Who approves before something irreversible happens?</strong></p>
+      <p class="dim" style="font-size:0.95rem">And how does the agent wait without crashing?</p>
+    </div>
+  </div>
+  <div class="insight">
+    <strong>Thesis:</strong> most production agent systems are <em>workflows</em> with one or two LLM decisions in them. Know when to add the agent, know how to pause it.
+  </div>
+</div>
+
+<!-- ====== 3: SECTION — ROUTING ====== -->
+<div class="slide section-slide">
+  <h2>Routing</h2>
+  <p style="font-size:1.3rem">One agent got you here.<br>Multiple specialists need a traffic cop.</p>
+</div>
+
+<!-- ====== 4: WORKFLOW VS AGENT ====== -->
+<div class="slide">
+  <h2>The framing: <span class="accent">workflow</span> vs <span class="accent">agent</span></h2>
+  <p class="big">Anthropic's taxonomy. Most teams now use the same words.</p>
+  <div class="cols" style="margin-top:1.5rem">
+    <div class="card">
+      <h3>Workflow</h3>
+      <p><strong>Steps wired in code.</strong> The LLM runs inside predefined boxes but doesn't decide the flow.</p>
+      <p class="dim">Deterministic. Cheap. Easy to debug.</p>
+      <p class="dim" style="font-size:0.9rem">Examples: rule-based router, embedding classifier, fixed pipeline.</p>
+    </div>
+    <div class="card">
+      <h3>Agent</h3>
+      <p><strong>The LLM decides what happens next</strong> — which tool, which branch, when to stop.</p>
+      <p class="dim">Flexible. More expensive. Harder to trace.</p>
+      <p class="dim" style="font-size:0.9rem">Examples: LLM classifier, handoffs, orchestrator-workers.</p>
+    </div>
+  </div>
+  <div class="insight">
+    <strong>Default:</strong> start with a workflow. Promote to an agent only when the LLM's judgment earns its cost.
+  </div>
+</div>
+
+<!-- ====== 5: WHEN TO PROMOTE ====== -->
+<div class="slide">
+  <h2>When do you need an <span class="accent">agent</span>?</h2>
+  <p class="big">Three signals the workflow isn't enough:</p>
+  <div style="margin-top:1.5rem; display:flex; flex-direction:column; gap:1rem; max-width:52rem;">
+    <div class="card">
+      <p><span class="accent" style="font-family:'JetBrains Mono'">1</span> &nbsp; <strong>Natural language is getting in the way.</strong> Users say "<em>could you possibly schedule...</em>" and your keyword rules miss it.</p>
+    </div>
+    <div class="card">
+      <p><span class="accent" style="font-family:'JetBrains Mono'">2</span> &nbsp; <strong>Context changes the answer.</strong> "yes please" means nothing without the previous turn.</p>
+    </div>
+    <div class="card">
+      <p><span class="accent" style="font-family:'JetBrains Mono'">3</span> &nbsp; <strong>The decision space is open-ended.</strong> You can't enumerate the branches in code.</p>
+    </div>
+  </div>
+  <p class="big" style="margin-top:1.5rem">None of these? You don't need an agent. You need a <span class="accent">function</span>.</p>
+</div>
+
+<!-- ====== 5b: WHY SPLIT AT ALL ====== -->
+<div class="slide">
+  <h2>Why split at all?</h2>
+  <p class="big">One agent with too much to do <em>will</em> get worse.</p>
+  <div class="cols" style="margin-top:1.5rem">
+    <div class="card" style="border-top:3px solid #f87171">
+      <h3 style="color:#f87171">One fat agent</h3>
+      <p><strong>14 tools · 1 sprawling prompt</strong></p>
+      <p class="dim" style="font-size:0.95rem">Tool-choice confusion · conflicting modes · over-acting · prompts that contradict themselves</p>
+    </div>
+    <div class="card" style="border-top:3px solid #4ade80">
+      <h3 style="color:#4ade80">Router + specialists</h3>
+      <p><strong>1 router · 3–5 focused agents</strong></p>
+      <p class="dim" style="font-size:0.95rem">Smaller decision space per agent · prompts tuned to one job · cheaper tiers where possible</p>
+    </div>
+  </div>
+  <div class="insight">
+    <strong>Symptoms of overload:</strong> tool count past ~7, the prompt has "modes," the model over-acts, the decision tree is a forest of conditionals. Two of those = consider splitting.
+  </div>
+</div>
+
+<!-- ====== 6: SECTION — FOUR ROUTERS ====== -->
+<div class="slide section-slide">
+  <h2>Same task, four routers</h2>
+  <p style="font-size:1.3rem">Customer-support assistant. Four intents. Pick a traffic cop.</p>
+</div>
+
+<!-- ====== 7: THE TASK ====== -->
+<div class="slide">
+  <h2>The setup</h2>
+  <p class="big">One message in, one of four intents out, then a handler does the work.</p>
+  <div class="svg-diagram" style="margin:1.5rem 0; display:flex; justify-content:center">
+    <svg viewBox="0 0 900 260" xmlns="http://www.w3.org/2000/svg" style="max-width:54rem;">
+      <defs><marker id="r1" markerWidth="10" markerHeight="7" refX="10" refY="3.5" orient="auto"><polygon points="0 0, 10 3.5, 0 7" fill="#999"/></marker></defs>
+      <rect x="40" y="105" width="160" height="55" rx="10" fill="#1e1e2e" stroke="#888" stroke-width="2"/>
+      <text x="120" y="139" text-anchor="middle" fill="#fff" font-family="Inter" font-size="18" font-weight="700">user message</text>
+      <rect x="310" y="105" width="180" height="55" rx="10" fill="#1e1e2e" stroke="#d4a053" stroke-width="2.5"/>
+      <text x="400" y="140" text-anchor="middle" fill="#d4a053" font-family="Inter" font-size="20" font-weight="700">ROUTER</text>
+      <text x="400" y="190" text-anchor="middle" fill="#8a87a0" font-family="JetBrains Mono" font-size="13">rules · embeddings · llm · hybrid</text>
+      <rect x="610" y="20"  width="160" height="40" rx="8" fill="#1e1e2e" stroke="#888"/>
+      <rect x="610" y="75"  width="160" height="40" rx="8" fill="#1e1e2e" stroke="#888"/>
+      <rect x="610" y="150" width="160" height="40" rx="8" fill="#1e1e2e" stroke="#888"/>
+      <rect x="610" y="205" width="160" height="40" rx="8" fill="#1e1e2e" stroke="#888"/>
+      <text x="690" y="45"  text-anchor="middle" fill="#fff" font-family="Inter" font-size="14" font-weight="600">account</text>
+      <text x="690" y="100" text-anchor="middle" fill="#fff" font-family="Inter" font-size="14" font-weight="600">billing</text>
+      <text x="690" y="175" text-anchor="middle" fill="#fff" font-family="Inter" font-size="14" font-weight="600">technical</text>
+      <text x="690" y="230" text-anchor="middle" fill="#fff" font-family="Inter" font-size="14" font-weight="600">chitchat</text>
+      <line x1="200" y1="132" x2="305" y2="132" stroke="#999" stroke-width="2" marker-end="url(#r1)"/>
+      <line x1="490" y1="115" x2="605" y2="40"  stroke="#999" stroke-width="1.5" marker-end="url(#r1)"/>
+      <line x1="490" y1="125" x2="605" y2="95"  stroke="#999" stroke-width="1.5" marker-end="url(#r1)"/>
+      <line x1="490" y1="140" x2="605" y2="170" stroke="#999" stroke-width="1.5" marker-end="url(#r1)"/>
+      <line x1="490" y1="150" x2="605" y2="225" stroke="#999" stroke-width="1.5" marker-end="url(#r1)"/>
+    </svg>
+  </div>
+  <p class="big"><strong>Routers are cheap.</strong> Handlers that do real work run on smart-tier models. That's cost-aware routing.</p>
+</div>
+
+<!-- ====== 8: ROUTER 1 - RULES ====== -->
+<div class="slide">
+  <h2>Router 1 — <span class="accent">Rules</span></h2>
+  <p class="big">Plain Python. No model. Sub-millisecond.</p>
+  <div class="cols" style="margin-top:1rem">
+    <div>
+      <pre style="font-size:0.9rem"><span class="dim">def</span> route(msg):
+    m = msg.lower().strip()
+    <span class="hl">if m in {"hi","hey","thanks"}:</span>
+        <span class="hl">return "chitchat"</span>
+    if "refund" in m or "charge" in m or "invoice" in m:
+        return "billing"
+    if "password" in m or "log in" in m or "login" in m:
+        return "account"
+    if m.endswith("?"):
+        return "technical"
+    return "technical"  <span class="dim"># safe default</span></pre>
+    </div>
+    <div>
+      <table class="cmp">
+        <tr><th>Latency</th><td>&lt; 1 ms</td></tr>
+        <tr><th>Cost</th><td>$0</td></tr>
+        <tr><th>Deterministic</th><td class="green">yes</td></tr>
+        <tr><th>Natural phrasing</th><td class="red">breaks</td></tr>
+      </table>
+      <p style="font-size:1rem; margin-top:1rem">Good as a <strong>fast path</strong> on top of something smarter. Never as the only router.</p>
+    </div>
+  </div>
+</div>
+
+<!-- ====== 9: ROUTER 2 - EMBEDDINGS ====== -->
+<div class="slide">
+  <h2>Router 2 — <span class="accent">Embeddings</span></h2>
+  <p class="big">Embed the intents once at startup. Compare the message against them.</p>
+  <div class="cols" style="margin-top:1rem">
+    <div>
+      <pre style="font-size:0.88rem"><span class="dim"># at startup — runs once</span>
+INTENT_VECS = {
+    name: embed(desc)
+    for name, desc in INTENT_DESCRIPTIONS.items()
+}
+
+<span class="dim"># per message</span>
+async def route(msg):
+    v = await embed(msg)
+    <span class="hl">scores = {n: cosine(v, iv)</span>
+<span class="hl">              for n, iv in INTENT_VECS.items()}</span>
+    return max(scores, key=scores.get)</pre>
+    </div>
+    <div>
+      <table class="cmp">
+        <tr><th>Latency</th><td>~50 ms</td></tr>
+        <tr><th>Cost</th><td>~$0.02 / 10k</td></tr>
+        <tr><th>Deterministic</th><td class="green">yes</td></tr>
+        <tr><th>Natural phrasing</th><td class="green">handles it</td></tr>
+      </table>
+      <p style="font-size:1rem; margin-top:1rem"><strong>Dramatically underrated.</strong> For fixed intent sets, this is faster, cheaper, <em>and</em> more deterministic than an LLM.</p>
+    </div>
+  </div>
+</div>
+
+<!-- ====== 10: ROUTER 3 - LLM ====== -->
+<div class="slide">
+  <h2>Router 3 — <span class="accent">LLM classifier</span></h2>
+  <p class="big">Small, fast model. One job: return one label.</p>
+  <div class="cols" style="margin-top:1rem">
+    <div>
+      <pre style="font-size:0.88rem">PROMPT = """Return ONE label, lowercase:
+  account   - login, password, profile
+  billing   - invoices, refunds, plans
+  technical - how-to, bugs, integration
+  chitchat  - greetings, thanks"""
+
+async def route(msg):
+    r = await llm.ainvoke([
+        {"role":"system", "content": PROMPT},
+        {"role":"user",   "content": msg},
+    ], <span class="hl">temperature=0, max_tokens=8</span>)
+    return validate(r.content)</pre>
+    </div>
+    <div>
+      <table class="cmp">
+        <tr><th>Latency</th><td>200–500 ms</td></tr>
+        <tr><th>Cost</th><td>~$0.65 / 10k</td></tr>
+        <tr><th>Deterministic</th><td class="red">no</td></tr>
+        <tr><th>Context-aware</th><td class="green">yes</td></tr>
+      </table>
+      <p style="font-size:1rem; margin-top:1rem">Reach for it when nuance matters — slang, sarcasm, "yes please" follow-ups.</p>
+    </div>
+  </div>
+</div>
+
+<!-- ====== 11: ROUTER 4 - HYBRID ====== -->
+<div class="slide">
+  <h2>Router 4 — <span class="accent">Hybrid</span></h2>
+  <p class="big">Embeddings first. LLM only for the ambiguous cases.</p>
+  <pre style="font-size:0.9rem; max-width:60rem"><span class="dim">async def</span> route(msg):
+    scores = embedding_scores(msg)
+    best   = max(scores, key=scores.get)
+
+    <span class="hl">if scores[best] &gt;= 0.55:          # confident → ship it</span>
+        <span class="hl">return best</span>
+
+    <span class="dim"># ambiguous → fall through to the LLM</span>
+    return await llm_classify(msg)</pre>
+  <div class="insight">
+    <strong>The production default.</strong> ~75% of messages clear the threshold on the fast path. The LLM only runs on the 25% that actually need it.
+  </div>
+</div>
+
+<!-- ====== 12: LIVE COMPARISON ====== -->
+<div class="slide">
+  <h2>Same 12 messages, four routers</h2>
+  <p class="big">Accuracy. Latency. Cost. Side by side.</p>
+  <table class="cmp" style="margin-top:1.5rem; font-size:1.1rem">
+    <tr>
+      <th>router</th>
+      <th class="num">accuracy</th>
+      <th class="num">avg router ms</th>
+      <th class="num">route $</th>
+      <th class="num">total $</th>
+    </tr>
+    <tr>
+      <td><strong>rules</strong></td>
+      <td class="num red">67%</td>
+      <td class="num">0.1</td>
+      <td class="num">$0.00000</td>
+      <td class="num">$0.03120</td>
+    </tr>
+    <tr>
+      <td><strong>embeddings</strong></td>
+      <td class="num">83%</td>
+      <td class="num">48.2</td>
+      <td class="num">$0.00002</td>
+      <td class="num">$0.03118</td>
+    </tr>
+    <tr>
+      <td><strong>llm</strong></td>
+      <td class="num green">92%</td>
+      <td class="num red">312.7</td>
+      <td class="num">$0.00049</td>
+      <td class="num">$0.03165</td>
+    </tr>
+    <tr>
+      <td><strong>hybrid</strong></td>
+      <td class="num green">92%</td>
+      <td class="num">105.3</td>
+      <td class="num">$0.00018</td>
+      <td class="num">$0.03134</td>
+    </tr>
+  </table>
+  <div class="cue">cd demos/routing-agent &amp;&amp; python compare.py</div>
+</div>
+
+<!-- ====== 13: WHAT THE TABLE TELLS US ====== -->
+<div class="slide">
+  <h2>What the numbers say</h2>
+  <div style="display:flex; flex-direction:column; gap:1rem; margin-top:1rem; max-width:52rem">
+    <div class="card">
+      <p><span class="accent" style="font-family:'JetBrains Mono'">1</span> &nbsp; <strong>Rules are free &mdash; and wrong a third of the time.</strong> Fast path only.</p>
+    </div>
+    <div class="card">
+      <p><span class="accent" style="font-family:'JetBrains Mono'">2</span> &nbsp; <strong>Embeddings are ~25&times; cheaper than LLM</strong> for ~90% of the accuracy.</p>
+    </div>
+    <div class="card">
+      <p><span class="accent" style="font-family:'JetBrains Mono'">3</span> &nbsp; <strong>Hybrid matches LLM at a third of the latency.</strong> Most production systems end up here.</p>
+    </div>
+  </div>
+  <div class="insight">
+    <strong>Cost-aware routing:</strong> the cheap step decides which expensive step runs. A good router saves 80–95% on smart-tier spend compared to running everything through the smart tier.
+  </div>
+</div>
+
+<!-- ====== 14: STICKY STATE — WHAT ====== -->
+<div class="slide">
+  <h2>The under-discussed win: <span class="accent">sticky state</span></h2>
+  <p class="big">Sometimes the previous turn <em>already</em> made the answer obvious. The router doesn't need to think.</p>
+  <div class="cols" style="margin-top:1.5rem">
+    <div class="card">
+      <h3>Without sticky state</h3>
+      <pre style="font-size:0.85rem; max-width:100%">agent › Here are 3 slots:
+         1. 2pm  2. 3pm  4pm
+user  › the 3pm one
+      <span class="dim">// router weighs all 4 intents</span>
+      <span class="dim">// gets it wrong 8% of the time</span></pre>
+    </div>
+    <div class="card">
+      <h3>With sticky state</h3>
+      <pre style="font-size:0.85rem; max-width:100%">agent › Here are 3 slots:
+         1. 2pm  2. 3pm  4pm
+      <span class="hl">// state: awaiting_slot_selection</span>
+user  › the 3pm one
+      <span class="accent">// router skipped. Handler: booking.</span></pre>
+    </div>
+  </div>
+  <div class="insight">
+    <strong>The idea:</strong> when a sticky flow is active and the message looks like a continuation, bypass the router entirely. Cheaper, faster, <em>and</em> deterministic for flows that need to be deterministic.
+  </div>
+</div>
+
+<!-- ====== 14b: STICKY STATE — HOW ====== -->
+<div class="slide">
+  <h2>Wiring up sticky state</h2>
+  <p class="big">Two parts: <strong>prior state</strong> from the last turn, plus a <strong>lightweight pattern check</strong> on the current message.</p>
+  <pre style="font-size:0.88rem; max-width:60rem">async def dispatch(message, session):
+    <span class="dim"># 1. Did the prior turn set up a sticky flow?</span>
+    <span class="hl">sticky = session.get("awaiting")</span>  <span class="dim"># e.g. "slot_selection"</span>
+
+    <span class="dim"># 2. Does the message look like a continuation of that flow?</span>
+    if sticky == "slot_selection" and <span class="hl">looks_like_slot_pick(message)</span>:
+        <span class="accent">return "booking"         # skip the router</span>
+
+    if sticky == "confirmation" and <span class="hl">looks_like_yes_no(message)</span>:
+        <span class="accent">return session["pending_intent"]</span>
+
+    <span class="dim"># 3. Otherwise, fall through to the normal router</span>
+    return await router.route(message)</pre>
+  <p class="big" style="margin-top:1rem">Handlers <strong>set</strong> the sticky flag when they show a list; the next turn <strong>reads</strong> it.</p>
+  <div class="insight">
+    <strong>Rule:</strong> only fast-path when state + message are unambiguous. Borderline cases belong in the router where the model can weigh history. If you're adding heuristics for edge cases, <em>stop</em> — that's router territory.
+  </div>
+</div>
+
+<!-- ====== 15: THREE WAYS TO DELEGATE ====== -->
+<div class="slide">
+  <h2>Three ways to hand work off</h2>
+  <p class="big">Framework vocabulary is muddled. These shapes are different.</p>
+  <div class="cols-3" style="margin-top:1.2rem">
+    <div class="card">
+      <h3>Tool call</h3>
+      <p><strong>A calls a function</strong> that happens to run B. A keeps the conversation.</p>
+      <p class="dim" style="font-size:0.9rem">Default. Easiest to debug. Use when B returns a small answer.</p>
+    </div>
+    <div class="card">
+      <h3>Handoff</h3>
+      <p><strong>A transfers control</strong> to B. B now drives the conversation. A is done.</p>
+      <p class="dim" style="font-size:0.9rem">"Wrong specialist, you take it." OpenAI Agents SDK, LangGraph supervisor.</p>
+    </div>
+    <div class="card">
+      <h3>Worker spawn</h3>
+      <p><strong>A creates isolated workers</strong> with fresh contexts. Runs in parallel. Returns outputs.</p>
+      <p class="dim" style="font-size:0.9rem">Claude Code subagents. Use when parallelism is the point.</p>
+    </div>
+  </div>
+  <div class="insight">
+    <strong>Mistake:</strong> reaching for a handoff when a tool call would do. Handoffs are heavier, harder to trace, and lose caller continuity.
+  </div>
+</div>
+
+<!-- ====== 16: DECISION MATRIX ====== -->
+<div class="slide">
+  <h2>Picking a router</h2>
+  <table class="cmp" style="font-size:1.05rem; margin-top:1rem">
+    <tr><th>Your situation</th><th>Pick</th></tr>
+    <tr><td>&lt; 7 tools, one clear domain</td><td><strong>No router.</strong> Single agent.</td></tr>
+    <tr><td>Fixed intents, tight latency, high volume</td><td><strong>Embeddings.</strong></td></tr>
+    <tr><td>Fixed intents, occasional ambiguity</td><td><strong>Hybrid.</strong></td></tr>
+    <tr><td>Fuzzy intents, context-dependent</td><td><strong>LLM classifier.</strong></td></tr>
+    <tr><td>Framework has handoffs (Agents SDK)</td><td><strong>Skip upstream routing.</strong></td></tr>
+    <tr><td>Need an audit trail</td><td><strong>Rules or embeddings</strong> (deterministic)</td></tr>
+  </table>
+  <p class="big" style="margin-top:1.2rem">There is no "best" router. Pick trade-offs consciously.</p>
+</div>
+
+<!-- ====== 16b: WHAT ROUTING DOESN'T SOLVE ====== -->
+<div class="slide">
+  <h2>What routing <span class="accent">doesn't</span> solve</h2>
+  <p class="big">Real users send messages that span two specialties.</p>
+  <pre style="font-size:0.95rem; max-width:58rem; margin-top:1rem">"I was <span class="hl">charged twice</span> this month &mdash; can you also <span class="hl">reset my password</span> while you're at it?"</pre>
+  <p class="big" style="margin-top:1rem">A strict single-intent router has to pick one. The other half of the message is lost.</p>
+  <div class="insight">
+    <strong>That's the merge-vs-split tightrope</strong> — specialized enough to be accurate, general enough to handle real messages. When cross-cutting messages get handled wrong frequently, the fix is usually to <em>merge</em>, not to add handoffs. (Next session.)
+  </div>
+</div>
+
+<!-- ====== 17: SECTION — HITL ====== -->
+<div class="slide section-slide">
+  <h2>Human-in-the-Loop</h2>
+  <p style="font-size:1.3rem">The agent should pause before doing something you can't undo.</p>
+</div>
+
+<!-- ====== 18: WHY HITL ====== -->
+<div class="slide">
+  <h2>Why HITL exists</h2>
+  <p class="big">Some actions are too consequential for the agent to take alone.</p>
+  <div class="cols" style="margin-top:1.5rem">
+    <div class="card" style="border-top:3px solid #f87171">
+      <h3 style="color:#f87171">Gate these</h3>
+      <p>Issue refund · send contract · delete user · merge PR · run migration</p>
+      <p class="dim" style="font-size:0.95rem">Hard to undo. Affects others. Costs money.</p>
+    </div>
+    <div class="card" style="border-top:3px solid #4ade80">
+      <h3 style="color:#4ade80">Don't gate these</h3>
+      <p>Read a file · draft a message · query state · create a todo</p>
+      <p class="dim" style="font-size:0.95rem">Local, reversible, visible to the user.</p>
+    </div>
+  </div>
+  <div class="insight">
+    <strong>Approval fatigue is real.</strong> A user who reflexively clicks "approve" provides zero safety. Gate the few actions whose worst case is genuinely bad.
+  </div>
+</div>
+
+<!-- ====== 19: HITL IS A STATE PROBLEM ====== -->
+<div class="slide">
+  <h2>HITL is a <span class="accent">state</span> problem</h2>
+  <p class="big">The agent pauses. The user walks away. Ten minutes later they approve.</p>
+  <p class="big" style="margin-top:1rem">Your process cannot be holding the entire run in memory.</p>
+  <div class="svg-diagram" style="margin:1.5rem 0; display:flex; justify-content:center">
+    <svg viewBox="0 0 900 180" xmlns="http://www.w3.org/2000/svg" style="max-width:54rem;">
+      <defs><marker id="h1" markerWidth="10" markerHeight="7" refX="10" refY="3.5" orient="auto"><polygon points="0 0, 10 3.5, 0 7" fill="#d4a053"/></marker></defs>
+      <rect x="30"  y="60" width="150" height="60" rx="10" fill="#1e1e2e" stroke="#888" stroke-width="2"/>
+      <text x="105" y="95" text-anchor="middle" fill="#fff" font-family="Inter" font-size="15" font-weight="700">agent runs</text>
+      <rect x="220" y="60" width="150" height="60" rx="10" fill="#1e1e2e" stroke="#d4a053" stroke-width="2"/>
+      <text x="295" y="88" text-anchor="middle" fill="#d4a053" font-family="Inter" font-size="15" font-weight="700">interrupt()</text>
+      <text x="295" y="107" text-anchor="middle" fill="#8a87a0" font-family="JetBrains Mono" font-size="11">checkpoint saved</text>
+      <rect x="410" y="60" width="150" height="60" rx="10" fill="#1e1e2e" stroke="#888" stroke-width="2" stroke-dasharray="4 3"/>
+      <text x="485" y="88" text-anchor="middle" fill="#fff" font-family="Inter" font-size="15" font-weight="700">process dies</text>
+      <text x="485" y="107" text-anchor="middle" fill="#8a87a0" font-family="JetBrains Mono" font-size="11">deploy · timeout</text>
+      <rect x="600" y="60" width="150" height="60" rx="10" fill="#1e1e2e" stroke="#888" stroke-width="2"/>
+      <text x="675" y="88" text-anchor="middle" fill="#fff" font-family="Inter" font-size="15" font-weight="700">human decides</text>
+      <text x="675" y="107" text-anchor="middle" fill="#8a87a0" font-family="JetBrains Mono" font-size="11">minutes later</text>
+      <rect x="790" y="60" width="90" height="60" rx="10" fill="#1e1e2e" stroke="#4ade80" stroke-width="2"/>
+      <text x="835" y="95" text-anchor="middle" fill="#4ade80" font-family="Inter" font-size="15" font-weight="700">resume</text>
+      <line x1="180" y1="90" x2="215" y2="90" stroke="#999" stroke-width="2" marker-end="url(#h1)"/>
+      <line x1="370" y1="90" x2="405" y2="90" stroke="#999" stroke-width="2" marker-end="url(#h1)"/>
+      <line x1="560" y1="90" x2="595" y2="90" stroke="#999" stroke-width="2" marker-end="url(#h1)"/>
+      <line x1="750" y1="90" x2="785" y2="90" stroke="#999" stroke-width="2" marker-end="url(#h1)"/>
+    </svg>
+  </div>
+  <p class="big"><strong>HITL is built on a checkpointer.</strong> Build the checkpointer first.</p>
+</div>
+
+<!-- ====== 20: DURABLE EXECUTION ====== -->
+<div class="slide">
+  <h2>The industry term: <span class="accent">durable execution</span></h2>
+  <p class="big">Every step is persisted. The run survives process restarts, deploys, and long pauses.</p>
+  <div class="cols" style="margin-top:1.5rem">
+    <div class="card">
+      <h3>Light-weight</h3>
+      <p><strong>LangGraph checkpointer</strong> (SQLite / Postgres)</p>
+      <p class="dim" style="font-size:0.95rem">Fine for chat approval gates. Good enough for most teams.</p>
+    </div>
+    <div class="card">
+      <h3>Heavy-duty</h3>
+      <p><strong>Temporal · Inngest · Restate</strong></p>
+      <p class="dim" style="font-size:0.95rem">When pauses last days, or you need exactly-once semantics.</p>
+    </div>
+  </div>
+  <div class="insight">
+    You don't need Temporal for an approval gate. But when someone says <em>"we put the agent on a durable execution engine"</em> — this is what they mean.
+  </div>
+</div>
+
+<!-- ====== 20b: HOW A CHECKPOINTER WORKS ====== -->
+<div class="slide">
+  <h2>How a checkpointer actually works</h2>
+  <p class="big">After every step, the graph writes its current state to storage keyed by a <code>thread_id</code>. On the next call with that <code>thread_id</code>, it reads the state back and continues.</p>
+  <div class="svg-diagram" style="margin:1.2rem 0; display:flex; justify-content:center">
+    <svg viewBox="0 0 900 210" xmlns="http://www.w3.org/2000/svg" style="max-width:54rem;">
+      <defs><marker id="c1" markerWidth="10" markerHeight="7" refX="10" refY="3.5" orient="auto"><polygon points="0 0, 10 3.5, 0 7" fill="#999"/></marker><marker id="c2" markerWidth="10" markerHeight="7" refX="10" refY="3.5" orient="auto"><polygon points="0 0, 10 3.5, 0 7" fill="#d4a053"/></marker></defs>
+      <rect x="60"  y="50"  width="160" height="55" rx="10" fill="#1e1e2e" stroke="#888"/>
+      <text x="140" y="83" text-anchor="middle" fill="#fff" font-family="Inter" font-size="15" font-weight="700">step 1 runs</text>
+      <rect x="260" y="50"  width="160" height="55" rx="10" fill="#1e1e2e" stroke="#888"/>
+      <text x="340" y="83" text-anchor="middle" fill="#fff" font-family="Inter" font-size="15" font-weight="700">step 2 runs</text>
+      <rect x="460" y="50"  width="160" height="55" rx="10" fill="#1e1e2e" stroke="#d4a053" stroke-width="2.5"/>
+      <text x="540" y="75" text-anchor="middle" fill="#d4a053" font-family="Inter" font-size="15" font-weight="700">interrupt()</text>
+      <text x="540" y="95" text-anchor="middle" fill="#8a87a0" font-family="JetBrains Mono" font-size="11">pause</text>
+      <rect x="660" y="50"  width="180" height="55" rx="10" fill="#1e1e2e" stroke="#4ade80" stroke-width="2"/>
+      <text x="750" y="83" text-anchor="middle" fill="#4ade80" font-family="Inter" font-size="15" font-weight="700">step 3 resumes</text>
+      <line x1="220" y1="77" x2="255" y2="77" stroke="#999" stroke-width="2" marker-end="url(#c1)"/>
+      <line x1="420" y1="77" x2="455" y2="77" stroke="#999" stroke-width="2" marker-end="url(#c1)"/>
+      <line x1="620" y1="77" x2="655" y2="77" stroke="#999" stroke-width="2" stroke-dasharray="4 3" marker-end="url(#c1)"/>
+      <rect x="260" y="150" width="360" height="40" rx="8" fill="#1e1e2e" stroke="#d4a053"/>
+      <text x="440" y="175" text-anchor="middle" fill="#d4a053" font-family="Inter" font-size="14" font-weight="700">checkpointer (SQLite · Postgres)</text>
+      <line x1="140" y1="105" x2="280" y2="150" stroke="#d4a053" stroke-width="1.5" marker-end="url(#c2)"/>
+      <line x1="340" y1="105" x2="380" y2="150" stroke="#d4a053" stroke-width="1.5" marker-end="url(#c2)"/>
+      <line x1="540" y1="105" x2="480" y2="150" stroke="#d4a053" stroke-width="1.5" marker-end="url(#c2)"/>
+      <line x1="600" y1="150" x2="710" y2="105" stroke="#4ade80" stroke-width="1.5" marker-end="url(#c2)"/>
+      <text x="615" y="132" fill="#4ade80" font-family="JetBrains Mono" font-size="11">read</text>
+      <text x="280" y="140" fill="#d4a053" font-family="JetBrains Mono" font-size="11">write</text>
+    </svg>
+  </div>
+  <pre style="font-size:0.88rem; max-width:58rem"><span class="dim">from</span> langgraph.checkpoint.sqlite <span class="dim">import</span> SqliteSaver
+
+graph = builder.compile(<span class="hl">checkpointer=SqliteSaver.from_conn_string("state.db")</span>)
+
+<span class="dim"># First call — runs until interrupt()</span>
+graph.invoke({"message": msg}, config={<span class="hl">"configurable": {"thread_id": "user-42"}</span>})
+
+<span class="dim"># Later, maybe a different process — resumes right where it paused</span>
+graph.invoke(Command(resume={"action": "approve"}), config={<span class="hl">"configurable": {"thread_id": "user-42"}</span>})</pre>
+</div>
+
+<!-- ====== 21: THE INTERRUPT PRIMITIVE ====== -->
+<div class="slide">
+  <h2>The primitive: <code style="font-size:0.7em">interrupt()</code></h2>
+  <p class="big">A function that takes minutes (or hours) to return.</p>
+  <pre style="font-size:0.92rem; max-width:58rem"><span class="dim">from</span> langgraph.types <span class="dim">import</span> interrupt
+
+def approve_refund(state):
+    <span class="hl">decision = interrupt({                      # ← execution pauses here</span>
+<span class="hl">        "kind": "approval_required",</span>
+<span class="hl">        "tool": "issue_refund",</span>
+<span class="hl">        "args": state["pending_tool_call"]["args"],</span>
+<span class="hl">    })</span>
+
+    <span class="dim"># When the user approves, the graph resumes with `decision`</span>
+    if decision["action"] == "approve":
+        return {"approved": True}
+    if decision["action"] == "edit":
+        return {"approved": True, "args_override": decision["args"]}
+    return {"approved": False}</pre>
+  <p class="big" style="margin-top:1rem">The <strong>caller</strong> (your app) renders the UI, gets the human's decision, resumes the graph.</p>
+</div>
+
+<!-- ====== 22: LIVE DEMO ====== -->
+<div class="slide">
+  <h2>Demo: <span class="accent">pause across processes</span></h2>
+  <p class="big">Kill the Python process mid-approval. Restart. Resume where we stopped.</p>
+  <pre style="font-size:0.95rem; max-width:56rem"><span class="dim">$</span> python agent.py
+you › refund the last two charges on my account
+  looking up charges...
+  [pending approval] issue_refund · $149.00 · 2 transactions
+  &gt; press ctrl-c to simulate a crash
+<span class="accent">^C</span>
+
+<span class="dim">$</span> python agent.py --resume
+  [checkpointer] found pending approval from 3 min ago
+  &gt; approve / edit / reject ? <span class="accent">approve</span>
+  refunding... ✓</pre>
+  <div class="cue">cd demos/hitl-agent &amp;&amp; python agent.py</div>
+</div>
+
+<!-- ====== 23: APPROVAL UI RULES ====== -->
+<div class="slide">
+  <h2>Designing the <span class="accent">approval surface</span></h2>
+  <p class="big">The wiring is easy. Deciding what to show the human is the hard part.</p>
+  <div style="margin-top:1.5rem; display:flex; flex-direction:column; gap:1rem; max-width:52rem">
+    <div class="card">
+      <p><span class="accent" style="font-family:'JetBrains Mono'">1</span> &nbsp; <strong>Show the action, not the reasoning.</strong> Humans approving a refund want the amount, the customer, the reason, two buttons. Bury the trace one click away.</p>
+    </div>
+    <div class="card">
+      <p><span class="accent" style="font-family:'JetBrains Mono'">2</span> &nbsp; <strong>Show the diff for edits.</strong> If they can edit before approving, highlight what changed. People skim and miss subtle edits.</p>
+    </div>
+    <div class="card">
+      <p><span class="accent" style="font-family:'JetBrains Mono'">3</span> &nbsp; <strong>Default-reject on timeout.</strong> A "yes" that arrives after the user's context is gone is not a real "yes."</p>
+    </div>
+  </div>
+</div>
+
+<!-- ====== 24: WHICH ACTIONS TO GATE ====== -->
+<div class="slide">
+  <h2>Which actions need approval?</h2>
+  <table class="cmp" style="font-size:1.1rem; margin-top:1rem">
+    <tr><th>Dimension</th><th>Gate it</th><th>Let it through</th></tr>
+    <tr><td>Reversibility</td><td class="red">hard to undo</td><td class="green">easy to undo</td></tr>
+    <tr><td>Blast radius</td><td class="red">others · money · external</td><td class="green">local to user</td></tr>
+    <tr><td>Frequency</td><td class="red">rare</td><td class="green">routine</td></tr>
+    <tr><td>Cost of false approval</td><td class="red">high</td><td class="green">low</td></tr>
+  </table>
+  <div class="insight">
+    <strong>Heuristic:</strong> add a gate the first time you imagine a story that starts with <em>"the agent did X and we couldn't undo it."</em> Don't add gates speculatively.
+  </div>
+</div>
+
+<!-- ====== 25: FINAL RULES ====== -->
+<div class="slide title-slide">
+  <h1 style="font-size:2.6rem; margin-bottom:2rem">Four rules to <span class="accent">take home</span></h1>
+  <div style="text-align:left; display:inline-block;">
+    <p style="font-size:1.25rem; color:var(--text); line-height:2.4">
+      <span class="accent" style="font-family:'JetBrains Mono'; margin-right:1rem; font-size:0.9rem">1</span> Workflow by default — agent only when judgment earns its cost<br>
+      <span class="accent" style="font-family:'JetBrains Mono'; margin-right:1rem; font-size:0.9rem">2</span> Embedding routing is the underrated option — try it first<br>
+      <span class="accent" style="font-family:'JetBrains Mono'; margin-right:1rem; font-size:0.9rem">3</span> Cheap step decides which expensive step runs<br>
+      <span class="accent" style="font-family:'JetBrains Mono'; margin-right:1rem; font-size:0.9rem">4</span> The moment a human enters the loop, you need durable execution
+    </p>
+  </div>
+  <p style="margin-top:2.5rem; font-size:1.1rem; color:var(--text)">Next session: reliability + observability</p>
+  <p style="margin-top:1rem; font-size:1rem; color:var(--text-dim)">Derrick Bozkurt &nbsp;&bull;&nbsp; <span class="accent">Prompt Engineers</span></p>
+</div>
+
+</div><!-- /deck -->
+
+<div class="progress" id="progress"></div>
+<div class="slide-number" id="slideNumber"></div>
+
+<script>
+  const slides = document.querySelectorAll('.slide');
+  let current = 0;
+
+  function goTo(n) {
+    if (n < 0 || n >= slides.length) return;
+    slides[current].classList.remove('active');
+    current = n;
+    slides[current].classList.add('active');
+    document.getElementById('progress').style.width = ((current/(slides.length-1))*100)+'%';
+    document.getElementById('slideNumber').textContent = (current+1)+' / '+slides.length;
+  }
+
+  document.addEventListener('keydown', e => {
+    if (['ArrowRight','ArrowDown',' '].includes(e.key)) { e.preventDefault(); goTo(current+1); }
+    if (['ArrowLeft','ArrowUp'].includes(e.key)) { e.preventDefault(); goTo(current-1); }
+    if (e.key==='Home') { e.preventDefault(); goTo(0); }
+    if (e.key==='End') { e.preventDefault(); goTo(slides.length-1); }
+  });
+
+  document.addEventListener('click', e => {
+    if (e.target.closest('pre')) return;
+    e.clientX > window.innerWidth/2 ? goTo(current+1) : goTo(current-1);
+  });
+
+  goTo(0);
+</script>
+</body>
+</html>

@@ -1,6 +1,6 @@
 # Worked Example — A Todo Agent, End to End
 
-[← Index](../../README.md) · [Glossary](../../glossary.md)
+[← Index](./README.md) · [Glossary](./glossary.md)
 
 > _Companion to the main guide. Builds one complete agent — small enough to read in a sitting, real enough to fork into something useful. Cites the chapter behind each layer so you can dive deeper as you go._
 
@@ -14,16 +14,16 @@ This is the example the rest of the guide implies but never fully assembles in o
 
 | #   | Feature                                                                                                  | Chapter                                               |
 | --- | -------------------------------------------------------------------------------------------------------- | ----------------------------------------------------- |
-| 1   | 4 todo CRUD tools with strict schemas, validation, idempotency, clear error returns                      | [Ch 3](../../03-tools.md)                                 |
-| 2   | System prompt composed from named sections, with today's date injected                                   | [Ch 7](../../07-prompts-as-code.md)                       |
-| 3   | Three kinds of state — todos in Postgres, message history in session state, conversation state in memory | [Ch 8](../../08-three-kinds-of-state.md)                  |
-| 4   | Cache-friendly prompt layout (stable prefix → dynamic tail)                                              | [Ch 9](../../09-context-and-cache-engineering.md)         |
-| 5   | Per-turn cache so repeated `list_todos` calls hit memory, not Postgres                                   | [Ch 16](../../16-shared-state.md)                         |
-| 6   | Token streaming to stdout via LangGraph's `stream_mode="messages"`                                       | [Ch 17](../../17-streaming.md)                            |
-| 7   | Reliability — recursion limit, validation, retry on idempotent ops                                       | [Ch 19](../../19-reliability.md)                          |
-| 8   | User scoping at the tool layer; the model never sees auth tokens                                         | [Ch 20](../../20-guardrails-prompt-injection-security.md) |
-| 9   | Per-turn structured log line                                                                             | [Ch 22](../../22-observability.md)                        |
-| 10  | One YAML eval case + the harness from Chapter 23                                                         | [Ch 23](../../23-evals-and-regression-testing.md)         |
+| 1   | 4 todo CRUD tools with strict schemas, validation, idempotency, clear error returns                      | [Ch 3](./03-tools.md)                                 |
+| 2   | System prompt composed from named sections, with today's date injected                                   | [Ch 7](./07-prompts-as-code.md)                       |
+| 3   | Three kinds of state — todos in Postgres, message history in session state, conversation state in memory | [Ch 8](./08-three-kinds-of-state.md)                  |
+| 4   | Cache-friendly prompt layout (stable prefix → dynamic tail)                                              | [Ch 9](./09-context-and-cache-engineering.md)         |
+| 5   | Per-turn cache so repeated `list_todos` calls hit memory, not Postgres                                   | [Ch 16](./16-shared-state.md)                         |
+| 6   | Token streaming to stdout via LangGraph's `stream_mode="messages"`                                       | [Ch 17](./17-streaming.md)                            |
+| 7   | Reliability — recursion limit, validation, retry on idempotent ops                                       | [Ch 19](./19-reliability.md)                          |
+| 8   | User scoping at the tool layer; the model never sees auth tokens                                         | [Ch 20](./20-guardrails-prompt-injection-security.md) |
+| 9   | Per-turn structured log line                                                                             | [Ch 22](./22-observability.md)                        |
+| 10  | One YAML eval case + the harness from Chapter 23                                                         | [Ch 23](./23-evals-and-regression-testing.md)         |
 
 ### What's out of scope (and where to find it)
 
@@ -200,7 +200,7 @@ Four things to notice in the diagram that the prose doesn't make obvious:
 
 - **Two LLM calls per turn** — one to decide on the tool, one to interpret the result and reply. Beginners often think the loop is one call; it isn't.
 - **The cache miss is normal on the first call of a turn** — `cache` is constructed fresh inside `run_turn`, so the first `list_todos` of every turn always misses. The cache pays off on the _second_ read in the same turn (e.g., a `list_todos → complete_todo → list_todos` sequence).
-- **`user_id` flows from `Config` into the DB query** without ever passing through the LLM. The trust boundary is the tool, not the model. ([Ch 20](../../20-guardrails-prompt-injection-security.md))
+- **`user_id` flows from `Config` into the DB query** without ever passing through the LLM. The trust boundary is the tool, not the model. ([Ch 20](./20-guardrails-prompt-injection-security.md))
 - **The model decides not to act** on the tool result — it sees no matching todo and responds with a clarifying question instead of fabricating a UUID. This is exactly what the eval case for "complete via list_todos lookup" is locking in.
 
 Now let's look at the code that makes this happen, layer by layer.
@@ -209,7 +209,7 @@ Now let's look at the code that makes this happen, layer by layer.
 
 ## Layer 1 — The database (Ch 8)
 
-Two tables: `users` and `todos`. The agent's tools are clients of this schema, never the source of truth — direct UI actions could write here too without going through the agent. This is the "structured DB as the canonical store" pattern from [Chapter 8](../../08-three-kinds-of-state.md).
+Two tables: `users` and `todos`. The agent's tools are clients of this schema, never the source of truth — direct UI actions could write here too without going through the agent. This is the "structured DB as the canonical store" pattern from [Chapter 8](./08-three-kinds-of-state.md).
 
 ```python
 # db.py
@@ -506,18 +506,18 @@ def make_tools(config: Config, cache: dict):
 
 Things to notice — each is a chapter principle in code:
 
-- **Per-tool ownership check** (`todo.user_id != config.user_id`) — the tool layer is the trust boundary, not the model. The user_id never appears in the prompt. ([Ch 20](../../20-guardrails-prompt-injection-security.md))
-- **UUID validation with helpful error string** — when the model hallucinates an ID, the tool tells it exactly what to do next instead of throwing. ([Ch 3](../../03-tools.md), [Ch 19](../../19-reliability.md))
-- **Idempotency on `complete_todo` and `update_todo`** — calling twice is safe; the second call returns "already completed" instead of erroring. ([Ch 19](../../19-reliability.md))
-- **Per-turn cache** — `list_todos` is cached on first call, invalidated on every write. A turn that does `list → complete → list` hits Postgres twice (first list, then the post-write list), not three times. ([Ch 16](../../16-shared-state.md))
-- **Strict args via type hints + docstrings** — LangChain's `@tool` will derive the JSON schema from the type hints; with `strict: True` on the underlying model the args are guaranteed to match. ([Ch 3](../../03-tools.md))
-- **Negative examples in docstrings** — every docstring says _don't_ in addition to _do_. ([Ch 3](../../03-tools.md), [Ch 28](../../28-tips-and-tricks.md))
+- **Per-tool ownership check** (`todo.user_id != config.user_id`) — the tool layer is the trust boundary, not the model. The user_id never appears in the prompt. ([Ch 20](./20-guardrails-prompt-injection-security.md))
+- **UUID validation with helpful error string** — when the model hallucinates an ID, the tool tells it exactly what to do next instead of throwing. ([Ch 3](./03-tools.md), [Ch 19](./19-reliability.md))
+- **Idempotency on `complete_todo` and `update_todo`** — calling twice is safe; the second call returns "already completed" instead of erroring. ([Ch 19](./19-reliability.md))
+- **Per-turn cache** — `list_todos` is cached on first call, invalidated on every write. A turn that does `list → complete → list` hits Postgres twice (first list, then the post-write list), not three times. ([Ch 16](./16-shared-state.md))
+- **Strict args via type hints + docstrings** — LangChain's `@tool` will derive the JSON schema from the type hints; with `strict: True` on the underlying model the args are guaranteed to match. ([Ch 3](./03-tools.md))
+- **Negative examples in docstrings** — every docstring says _don't_ in addition to _do_. ([Ch 3](./03-tools.md), [Ch 28](./28-tips-and-tricks.md))
 
 ---
 
 ## Layer 3 — The prompt (Ch 7, 9)
 
-The system prompt is built from named sections. Today's date is injected dynamically — the model has no concept of "tomorrow" otherwise. Notice the layout: the stable parts come first (role, rules, examples) so the prompt prefix is cache-friendly per [Chapter 9](../../09-context-and-cache-engineering.md), and the dynamic date sits _after_ them rather than woven in.
+The system prompt is built from named sections. Today's date is injected dynamically — the model has no concept of "tomorrow" otherwise. Notice the layout: the stable parts come first (role, rules, examples) so the prompt prefix is cache-friendly per [Chapter 9](./09-context-and-cache-engineering.md), and the dynamic date sits _after_ them rather than woven in.
 
 ```python
 # prompts.py
@@ -627,7 +627,7 @@ import time
 from datetime import date
 from uuid import UUID, uuid4
 from contextvars import ContextVar
-from sqlalchemy import select
+from sqlalchemy import select, func
 
 # langchain_openai provides the LLM client that speaks OpenAI's API.
 from langchain_openai import ChatOpenAI
@@ -650,9 +650,10 @@ current_turn_id: ContextVar[str] = ContextVar("turn_id", default="")
 # ---------------------------------------------------------------------------
 # Debug + memory flags (set via command line)
 # ---------------------------------------------------------------------------
-# --debug  : show what's happening under the hood (message list, cache, prompt)
+# --debug  : show what's happening under the hood — all three state lifetimes
 # These are module-level so all functions can check them.
 DEBUG = False
+_current_user_id = None  # Set at startup, used by debug functions
 
 # Conversation history persists across turns within a session.
 # This is the "Raw History" memory strategy — the full message list in memory.
@@ -950,41 +951,47 @@ def _debug_show_prompt(system_prompt: str) -> None:
 
 
 def _debug_show_messages(messages: list) -> None:
-    """Show the full message list being sent to the LLM.
+    """STATE: CONVERSATION — the message list (lifetime: session).
 
-    This is the key insight: the LLM sees ALL of this on every call.
-    Watch it grow turn by turn — that's why you need compaction.
+    The LLM sees ALL of this on every call. Watch it grow turn by turn.
+    This is the only context the model has — it starts from zero otherwise.
     """
     lines = []
     for i, msg in enumerate(messages):
         role = type(msg).__name__.replace("Message", "").lower()
         content = (msg.content or "")[:120]
         lines.append(f"  [{i}] {role}: {content}")
-    section("DEBUG:MESSAGES", f"{len(messages)} messages in context:\n" + "\n".join(lines))
+    section("STATE:CONVERSATION", f"{len(messages)} messages in context:\n" + "\n".join(lines))
 
 
 def _debug_show_cache(cache: dict) -> None:
-    """Show what's in the per-turn cache after the turn completes.
+    """STATE: SESSION — config + caches (lifetime: one turn).
 
     This cache dies when the turn ends. It only helps within a single turn
     (e.g., list → complete → list avoids a redundant DB query).
+    The user_id in Config also lives here — invisible to the LLM.
     """
     if cache:
         items = "\n".join(f"  {k}: {str(v)[:100]}" for k, v in cache.items())
-        section("DEBUG:CACHE", f"Per-turn cache ({len(cache)} entries):\n{items}")
+        section("STATE:SESSION", f"Per-turn cache ({len(cache)} entries):\n{items}")
     else:
-        section("DEBUG:CACHE", "Per-turn cache: empty (all entries were invalidated by writes)")
+        section("STATE:SESSION", "Per-turn cache: empty (all entries were invalidated by writes)")
 
 
 def _debug_show_history(history: list) -> None:
-    """Show the persistent conversation history across turns.
+    """STATE: PERSISTENT — the database + saved history (lifetime: forever).
 
     Watch this count grow turn by turn — that's raw history accumulating.
-    In production, you'd add compaction (LLM-generated summary of old turns)
-    when this gets too large for the context window.
+    This is what survives if the server restarts or the user comes back tomorrow.
     """
-    section("DEBUG:HISTORY",
-            f"Conversation history: {len(history)} messages persisted across turns")
+    with SessionLocal() as s:
+        todo_count = s.scalar(
+            select(func.count()).select_from(Todo)
+            .where(Todo.user_id == _current_user_id, Todo.completed == False)
+        ) or 0
+    section("STATE:PERSISTENT",
+            f"History: {len(history)} messages across turns | "
+            f"DB: {todo_count} pending todos for this user")
 
 
 if __name__ == "__main__":
@@ -998,8 +1005,10 @@ if __name__ == "__main__":
         user_id = _get_or_create_default_user()
         print(f"(local user: {user_id})")
 
+    _current_user_id = user_id  # Store for debug functions
+
     if DEBUG:
-        print("Debug mode ON — showing messages, cache, prompt, and memory state.\n")
+        print("Debug mode ON — showing all three state lifetimes.\n")
 
     print("Todo agent. Type a message, blank line to exit.\n")
     # In debug mode, print the system prompt so you can see what the LLM
@@ -1019,18 +1028,18 @@ if __name__ == "__main__":
 
 Things worth pointing out:
 
-- **`recursion_limit=6`** — caps the loop. A real runaway tool loop will be aborted instead of running forever or exhausting tokens. ([Ch 5](../../05-execution-loop.md), [Ch 19](../../19-reliability.md))
+- **`recursion_limit=6`** — caps the loop. A real runaway tool loop will be aborted instead of running forever or exhausting tokens. ([Ch 5](./05-execution-loop.md), [Ch 19](./19-reliability.md))
 - **One graph per turn** — this is a deliberate simplification for the example. In production you'd build the graph once at startup; here the per-turn rebuild is cheap and keeps the code linear.
-- **Tools and cache are scoped to the turn** — `Config` and `cache` are constructed inside `run_turn`, never global. Two concurrent users would naturally get isolated state. ([Ch 16](../../16-shared-state.md))
-- **Streaming uses `stream_mode="messages"`** — the `AIMessage` chunks carry text deltas; tool calls and tool results print as inline `[brackets]` and `→ arrows`. This is exactly the LangGraph streaming pattern from Chapter 17, just terminating in stdout instead of SSE. ([Ch 17](../../17-streaming.md))
-- **`_log_turn` writes one structured JSON line to stderr** — the canonical observability pattern from [Chapter 22](../../22-observability.md). Stderr is separate from the user-facing stdout stream; pipe it to a log file in production.
-- **Top-level error handling** — any exception in the graph becomes a stderr line and a non-zero return record, never a crash. Per [Chapter 19](../../19-reliability.md).
+- **Tools and cache are scoped to the turn** — `Config` and `cache` are constructed inside `run_turn`, never global. Two concurrent users would naturally get isolated state. ([Ch 16](./16-shared-state.md))
+- **Streaming uses `stream_mode="messages"`** — the `AIMessage` chunks carry text deltas; tool calls and tool results print as inline `[brackets]` and `→ arrows`. This is exactly the LangGraph streaming pattern from Chapter 17, just terminating in stdout instead of SSE. ([Ch 17](./17-streaming.md))
+- **`_log_turn` writes one structured JSON line to stderr** — the canonical observability pattern from [Chapter 22](./22-observability.md). Stderr is separate from the user-facing stdout stream; pipe it to a log file in production.
+- **Top-level error handling** — any exception in the graph becomes a stderr line and a non-zero return record, never a crash. Per [Chapter 19](./19-reliability.md).
 
 ---
 
 ## Layer 5 — The eval (Ch 23)
 
-One YAML case file. The runner is the harness from [Chapter 23](../../23-evals-and-regression-testing.md) — copied verbatim with no modifications, since the chapter put it in canonical form for exactly this reason.
+One YAML case file. The runner is the harness from [Chapter 23](./23-evals-and-regression-testing.md) — copied verbatim with no modifications, since the chapter put it in canonical form for exactly this reason.
 
 ```yaml
 # evals/cases.yaml
@@ -1112,19 +1121,19 @@ If you've read the guide and want to verify the example covers what it claims:
 
 | Chapter                                                                       | Where it appears                                                                        |
 | ----------------------------------------------------------------------------- | --------------------------------------------------------------------------------------- |
-| [Ch 3 — Tools](../../03-tools.md)                                                 | `tools.py` — strict-style schemas, validation, idempotency, negative-example docstrings |
-| [Ch 5 — Execution loop](../../05-execution-loop.md)                               | `agent.py` `build_graph()` — the canonical 2-node ReAct shape                           |
-| [Ch 6 — State and messages](../../06-state-and-messages.md)                       | `MessagesState`, the append-only message list passed to the graph                       |
-| [Ch 7 — Prompts as code](../../07-prompts-as-code.md)                             | `prompts.py` — composed from named constants by `build_system_prompt()`                 |
-| [Ch 8 — Three kinds of state](../../08-three-kinds-of-state.md)                   | Postgres = structured DB, MessagesState = conversation state, no long-term memory yet   |
-| [Ch 9 — Context & cache engineering](../../09-context-and-cache-engineering.md)   | Stable prefix first in `build_system_prompt()`; dynamic date last                       |
-| [Ch 16 — Shared state](../../16-shared-state.md)                                  | Per-turn `cache` dict closed over by tool factory, invalidated on writes                |
-| [Ch 17 — Streaming](../../17-streaming.md)                                        | `astream(stream_mode="messages")` in `run_turn()`                                       |
-| [Ch 19 — Reliability](../../19-reliability.md)                                    | Recursion limit, UUID validation, idempotent tools, error returns as strings            |
-| [Ch 20 — Guardrails & security](../../20-guardrails-prompt-injection-security.md) | Per-tool ownership check; `Config` never exposed to the LLM                             |
-| [Ch 22 — Observability](../../22-observability.md)                                | `_log_turn()` writes one structured JSON line per turn to stderr                        |
-| [Ch 23 — Evals](../../23-evals-and-regression-testing.md)                         | `evals/cases.yaml` + the harness from Ch 23                                             |
+| [Ch 3 — Tools](./03-tools.md)                                                 | `tools.py` — strict-style schemas, validation, idempotency, negative-example docstrings |
+| [Ch 5 — Execution loop](./05-execution-loop.md)                               | `agent.py` `build_graph()` — the canonical 2-node ReAct shape                           |
+| [Ch 6 — State and messages](./06-state-and-messages.md)                       | `MessagesState`, the append-only message list passed to the graph                       |
+| [Ch 7 — Prompts as code](./07-prompts-as-code.md)                             | `prompts.py` — composed from named constants by `build_system_prompt()`                 |
+| [Ch 8 — Three kinds of state](./08-three-kinds-of-state.md)                   | Postgres = structured DB, MessagesState = conversation state, no long-term memory yet   |
+| [Ch 9 — Context & cache engineering](./09-context-and-cache-engineering.md)   | Stable prefix first in `build_system_prompt()`; dynamic date last                       |
+| [Ch 16 — Shared state](./16-shared-state.md)                                  | Per-turn `cache` dict closed over by tool factory, invalidated on writes                |
+| [Ch 17 — Streaming](./17-streaming.md)                                        | `astream(stream_mode="messages")` in `run_turn()`                                       |
+| [Ch 19 — Reliability](./19-reliability.md)                                    | Recursion limit, UUID validation, idempotent tools, error returns as strings            |
+| [Ch 20 — Guardrails & security](./20-guardrails-prompt-injection-security.md) | Per-tool ownership check; `Config` never exposed to the LLM                             |
+| [Ch 22 — Observability](./22-observability.md)                                | `_log_turn()` writes one structured JSON line per turn to stderr                        |
+| [Ch 23 — Evals](./23-evals-and-regression-testing.md)                         | `evals/cases.yaml` + the harness from Ch 23                                             |
 
 That's the smallest agent that genuinely earns the name. Fork it, change the domain, swap in your tools, extend it as your symptoms demand.
 
-[← Index](../../README.md) · [Glossary](../../glossary.md)
+[← Index](./README.md) · [Glossary](./glossary.md)

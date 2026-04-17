@@ -112,6 +112,12 @@ The payload is immutable, explicit, and easy to test. Avoid the temptation to sh
 
 In LangGraph, this is what passing data through the graph state does. Each node returns a partial state update; the graph merges them; downstream nodes read from the merged state. **No mutation, just append/replace.**
 
+## A note on the "shared scratchpad" / store
+
+Modern frameworks give you a first-class place for cross-agent state: LangGraph's `Store`, CrewAI's shared memory, the Agents SDK session object. You'll hear this called a **shared scratchpad** or **shared store**. (It's the descendant of the "blackboard" pattern from classical AI, but almost nobody calls it that anymore.)
+
+The rules above still apply. A shared store is just *persistent shared state with a nicer API* — tightly scoped, explicit keys, durable storage underneath. Use it when multiple agents genuinely need a common workspace (a plan being iteratively refined, a running set of findings). Don't use it as a dumping ground.
+
 ## Heuristic
 
 > **Default to immutable config + per-turn cache. If you reach for persistent shared state, ask: is there a tool that could fetch this fresh instead?**

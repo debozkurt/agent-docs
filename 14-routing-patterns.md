@@ -10,6 +10,17 @@ But routing is not one technique — it's a category. There are at least four me
 
 This chapter walks through all four, gives concrete trade-offs, and ends with a decision matrix. Pick the one that matches your constraints, not the one that sounds most impressive.
 
+## Workflow vs agent — the framing everyone else uses
+
+Before we get into routing, know the vocabulary. Anthropic's *Building Effective Agents* split the landscape into two shapes, and most teams now use the same words:
+
+- **Workflow** — steps wired together in code. The LLM runs inside predefined boxes but doesn't decide the flow. Deterministic, cheap, easy to debug.
+- **Agent** — the LLM decides what happens next, including which tools to call and when to stop. Flexible, more expensive, harder to trace.
+
+Routing lives on both sides. A rule-based or embedding router is a *workflow*. An LLM classifier or an agent handoff is an *agent-style* router. When you pick a pattern below, you're also picking where on that spectrum you want to be.
+
+The default advice everyone gives: **start with a workflow, promote to an agent only when the extra flexibility earns its cost**.
+
 ## The first question: do you actually need a separate router?
 
 Modern frontier models can choose competently from ~7 tools without help. Anthropic's *Building Effective Agents* essay is explicit: "you should consider adding complexity only when it demonstrably improves outcomes." OpenAI's *Practical Guide to Building Agents* makes the same point: "while orchestrating via LLM is powerful, orchestrating via code makes tasks more deterministic and predictable."[^anthropic][^openai]
@@ -210,6 +221,35 @@ Why it's compelling:
 
 When to use handoffs vs upstream routing: handoffs win when the framework supports them well and your manager naturally has enough context to delegate intelligently. Upstream routing wins when you want a separate, cheaper classification step that doesn't pay the full agent's latency.
 
+## Two more patterns worth knowing
+
+Routing isn't the only way to compose multiple agents. Two more shapes from the Anthropic taxonomy come up constantly in production systems:
+
+### Parallelization (fan-out / fan-in)
+
+Split one task across several agents running at the same time, then merge the results. Two common flavors:
+
+- **Sectioning** — break a task into independent pieces (summarize each chapter, classify each row) and run them in parallel.
+- **Voting** — run the same task N times with different prompts or models and pick the best answer (majority vote, highest-confidence, a judge agent).
+
+Use it when the pieces genuinely don't depend on each other and latency matters. Don't use it when the work is sequential — parallelizing dependent steps just adds coordination bugs.
+
+```python
+# sketch — fan out, fan in
+results = await asyncio.gather(*[
+    summarize_chapter(ch) for ch in chapters
+])
+final = merge(results)
+```
+
+### Evaluator-optimizer loop
+
+One agent produces an output, a second agent critiques it, the first revises. Loop until the critic is satisfied or you hit a cap.
+
+Use it when quality matters more than latency — code generation, writing, translation, anything where "a second pass catches mistakes" is true. The critic is usually a different prompt (sometimes a different model) with explicit criteria. Cap the loop at 2–3 iterations or you'll burn tokens forever.
+
+Both of these show up in the decision matrix later, and both are first-class patterns in the Agents SDK and LangGraph. Don't treat them as exotic.
+
 ## Handoff vs tool call vs worker spawn — three ways to delegate
 
 Multi-agent design has three structurally different ways for one agent to give work to another, and they get blurred constantly because frameworks use overlapping vocabulary. They're worth distinguishing because the trade-offs are real.
@@ -241,6 +281,8 @@ Pick the routing approach that matches your constraints:
 | Fixed intents but ambiguous natural language | **Embedding + LLM fallback** (hybrid) |
 | Fuzzy intents, conversation-dependent disambiguation | **LLM classification** (Pattern 3) |
 | Using OpenAI Agents SDK or similar handoff framework | **Agent handoffs** (Pattern 4) |
+| Task decomposes into independent pieces | **Parallelization** (fan-out / fan-in) |
+| Quality matters more than latency | **Evaluator-optimizer loop** |
 | Very high volume + the cheapest possible per-turn cost | **Embedding-based**, no fallback |
 | You need an audit trail of routing decisions | **Embedding-based or rule-based** (deterministic) |
 

@@ -22,6 +22,8 @@ These compose. A complex agent might have an approval gate on `send_email`, a re
 
 HITL has one hard architectural prerequisite: **the agent's state must be durable across the pause**. If the user takes ten minutes to approve, your process can't be holding the entire run in memory and dying at the next deploy. This is exactly the problem [Chapter 12 (state recovery)](./12-state-recovery.md) solves: a checkpointer persists the agent's state at every step, and the run can be resumed by a different process at a later time. **HITL is built on top of checkpointing.** If you want approval gates, build a checkpointer first.
 
+The industry term for this property is **durable execution** — the run survives process restarts, deploys, and long pauses because every step is persisted. LangGraph's checkpointer is one implementation; Temporal, Inngest, and Restate are the heavy-duty options teams reach for when the durability requirements go beyond "survive a deploy" (think: hours-to-days-long workflows, strict exactly-once semantics). You don't need Temporal for a chat approval gate, but it's worth knowing the word — when someone says "we put the agent on a durable execution engine," this is what they mean.
+
 The other piece is an **interrupt API** in your agent loop. Both LangGraph and the OpenAI Agents SDK expose this directly: a node can call `interrupt(payload)`, which suspends execution and returns control to the caller with the payload. The caller (your application) presents the payload to a human, collects a response, and resumes the graph with that response as the interrupt's "return value." From the agent's perspective, `interrupt()` is a function that takes minutes to return.
 
 ```python
