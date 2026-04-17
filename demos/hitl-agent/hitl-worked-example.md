@@ -42,10 +42,10 @@ python3 scenarios.py --only s5 -v                # crash-resume (marquee)
 python3 scenarios.py --only s6 -v                # post-review gate
 
 # ── interactive REPL ──
-python3 agent.py                                 # new conversation
+python3 agent.py                                 # new conversation (fresh thread)
 python3 agent.py -v                              # new conversation, verbose
-python3 agent.py --thread mytest                 # named thread
-python3 agent.py --resume --thread mytest        # resume a paused thread
+python3 agent.py --thread mytest                 # named thread (reuse for crash-resume)
+python3 agent.py --resume --thread mytest        # resume a paused named thread
 ```
 
 **Suggested presentation order:** `s1 → s2 → s3 → s5 → s6 → s4`.
@@ -967,12 +967,21 @@ from __future__ import annotations
 
 import argparse
 import sys
+import time
 
 from langgraph.checkpoint.sqlite import SqliteSaver
 from langgraph.types import Command
 
 import tracing
 from graph import build_graph
+
+
+def _default_thread() -> str:
+    """Fresh thread_id per session so old state never bleeds in.
+
+    Each REPL session gets its own thread. For crash-resume, use --thread
+    to name it explicitly, then --resume --thread <name> to pick it up."""
+    return f"demo-{int(time.time())}"
 
 
 def _pending_interrupts(snap) -> list:
@@ -1049,22 +1058,32 @@ def main():
     ap.add_argument("-v", "--verbose", action="store_true",
                     help="Show LLM calls, tool I/O, gates, checkpoints, DB writes.")
     ap.add_argument("--resume", action="store_true")
-    ap.add_argument("--thread", default="demo")
+    ap.add_argument("--thread", default=None,
+                    help="Thread id. Defaults to a fresh timestamped id per session. "
+                         "Name it explicitly for crash-resume demos.")
     args = ap.parse_args()
 
     tracing.VERBOSE = args.verbose
+
+    # --resume requires an explicit --thread (which thread to resume?)
+    if args.resume and not args.thread:
+        ap.error("--resume requires --thread <thread_id> "
+                 "(which paused thread do you want to resume?)")
+
+    # Default: fresh thread per session so old state never interferes.
+    thread_id = args.thread or _default_thread()
 
     with SqliteSaver.from_conn_string("hitl.sqlite") as ckpt:
         graph = build_graph(checkpointer=ckpt)
 
         if args.resume:
-            print(f"Resuming thread={args.thread!r}...")
-            tracing.trace_resume(args.thread, ["(loading...)"])
-            state = run_until_done(graph, args.thread)
+            print(f"Resuming thread={thread_id!r}...")
+            tracing.trace_resume(thread_id, ["(loading...)"])
+            state = run_until_done(graph, thread_id)
             _print_final(state)
             return
 
-        print(f"Messaging Agent | thread={args.thread}  (blank line to exit)\n")
+        print(f"Messaging Agent | thread={thread_id}  (blank line to exit)\n")
         while True:
             try:
                 msg = input("you > ").strip()
@@ -1075,7 +1094,7 @@ def main():
                 return
             tracing.section("USER", msg)
             state = run_until_done(
-                graph, args.thread,
+                graph, thread_id,
                 invoke_args={"messages": [{"role": "user", "content": msg}]},
             )
             _print_final(state)
