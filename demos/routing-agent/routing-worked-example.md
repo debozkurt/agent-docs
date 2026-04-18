@@ -839,6 +839,158 @@ def fmt_cost(x: float) -> str:
     return f"${x:.6f}" if x < 0.001 else f"${x:.5f}"
 
 
+# ─────────────────────────── live flow trace ────────────────────────────────
+
+# Per-router accent colors — the router node and chosen handler wear this
+# color so it's obvious at a glance which style is driving the decision.
+MAGENTA = "\033[35m"
+ROUTER_COLOR = {
+    "rules":      CYAN,
+    "embeddings": GREEN,
+    "llm":        MAGENTA,
+    "hybrid":     YELLOW,
+}
+
+
+HANDLERS_ROW = ["account", "billing", "technical", "chitchat"]
+
+
+def paint_graph(router: str, trace: Trace) -> str:
+    """Render the message's path through the graph as a live-annotated trace:
+    START → router → intent_dispatch → {account|billing|technical|chitchat}
+    → END. The upper nodes (router, dispatch) are wide boxes with per-node
+    annotations on the right; the dispatch arrow fans out to all four handler
+    boxes in a row so the graph structure is visible, with the chosen handler
+    lit in the router's accent color and the other three dimmed. Handler
+    metrics + response text drop from the chosen handler's column down to END."""
+    c = ROUTER_COLOR.get(router, "")
+    d = trace.router_details or {}
+    pt = trace.tokens.get("prompt", 0)
+    ct = trace.tokens.get("completion", 0)
+    model = trace.tokens.get("model", "?")
+    resp = trace.handler_response.strip().replace("\n", " ")
+    if len(resp) > 60:
+        resp = resp[:57] + "..."
+
+    # One-line decision summary — what the router actually did this turn.
+    if router == "rules":
+        if d.get("used_default"):
+            decision = f"no keyword matched → default '{trace.intent}'"
+        else:
+            decision = f"keyword {d.get('matched_keyword')!r} → '{trace.intent}'"
+    elif router == "embeddings":
+        top = max((d.get("scores") or {}).values(), default=0.0)
+        decision = f"top cosine {top:.2f} → '{trace.intent}'"
+    elif router == "llm":
+        decision = f"classified → '{trace.intent}'"
+    elif router == "hybrid":
+        if d.get("fell_through_to_llm"):
+            decision = f"embed < threshold · LLM → '{trace.intent}'"
+        else:
+            decision = f"embed ≥ threshold → '{trace.intent}'"
+    else:
+        decision = f"→ '{trace.intent}'"
+
+    # ── Upper section: START → router box → intent_dispatch box ─────────
+    W = 34                    # inner box width
+    IND = " " * (2 + W // 2)  # column of the vertical arrow between boxes
+
+    def upper_box(label: str, colored: bool) -> tuple[str, str, str]:
+        col = c if colored else ""
+        rst = RESET if colored else ""
+        pad = " " * (W - 1 - len(label))
+        return (
+            f"  ┌{'─' * W}┐",
+            f"  │ {col}{label}{rst}{pad}│",
+            f"  └{'─' * ((W // 2) - 1)}┬{'─' * (W - (W // 2))}┘",
+        )
+
+    out: list[str] = [f"{IND[:-2]}START", f"{IND}│", f"{IND}▼"]
+
+    top, mid, bot = upper_box(f"router · {router}", colored=True)
+    out += [
+        top,
+        f"{mid}  {trace.router_ms:>5.0f}ms · {fmt_cost(trace.router_cost)}",
+        bot,
+        f"{IND}│  {DIM}{decision}{RESET}",
+        f"{IND}▼",
+    ]
+
+    top, mid, bot = upper_box("intent_dispatch", colored=False)
+    out += [
+        top,
+        f"{mid}  {DIM}conditional edge on state.intent{RESET}",
+        bot,
+        f"{IND}│",
+        f"{IND}▼",
+    ]
+
+    # ── Fan-out bar + row of 4 handler boxes ────────────────────────────
+    # Handler box geometry is chosen so that box 1 (billing) is centered on
+    # the same column as the dispatch arrow above (col 19). That makes the
+    # bar's ┼ junction sit directly under the dispatch ┬.
+    HW, HG, HLM = 11, 2, 1                                   # outer / gap / left margin
+    centers = [HLM + i * (HW + HG) + HW // 2 for i in range(4)]  # [6, 19, 32, 45]
+    chosen_i = (HANDLERS_ROW.index(trace.intent)
+                if trace.intent in HANDLERS_ROW else 1)
+    chosen_col = centers[chosen_i]
+
+    # Bar row: ┌─...─┼─...─┬─...─┐  (┼ at col 19 = dispatch entry)
+    bar = [" "] * (centers[-1] + 1)
+    bar[centers[0]]  = "┌"
+    bar[centers[-1]] = "┐"
+    for col in centers[1:-1]:
+        bar[col] = "┬"
+    for a, b in zip(centers, centers[1:]):
+        for j in range(a + 1, b):
+            bar[j] = "─"
+    bar[19] = "┼"  # dispatch arrow enters here
+
+    def _row_at(cols: list[int], ch: str) -> str:
+        row = [" "] * (cols[-1] + 1)
+        for col in cols:
+            row[col] = ch
+        return "".join(row)
+
+    def _colorize_col(s: str, col: int) -> str:
+        return s[:col] + f"{c}{s[col]}{RESET}" + s[col + 1:]
+
+    out += [
+        _colorize_col("".join(bar), chosen_col),
+        _colorize_col(_row_at(centers, "│"), chosen_col),
+        _colorize_col(_row_at(centers, "▼"), chosen_col),
+    ]
+
+    # Handler boxes: chosen gets color `c`, others DIM.
+    inner = HW - 2  # 9
+
+    def _row(tile_fn) -> str:
+        parts = [" " * HLM]
+        for i, name in enumerate(HANDLERS_ROW):
+            col = c if i == chosen_i else DIM
+            parts.append(f"{col}{tile_fn(name)}{RESET}")
+            if i < len(HANDLERS_ROW) - 1:
+                parts.append(" " * HG)
+        return "".join(parts)
+
+    out += [
+        _row(lambda _: "┌" + "─" * inner + "┐"),
+        _row(lambda n: "│" + f"{n:^{inner}}" + "│"),
+        _row(lambda _: "└" + "─" * inner + "┘"),
+    ]
+
+    # ── Drop from chosen handler to END, carrying metrics + response ────
+    cind = " " * chosen_col
+    out += [
+        f"{cind}│  {DIM}{model} · {trace.handler_ms:.0f}ms"
+        f" · {fmt_cost(trace.handler_cost)} · ({pt}→{ct} tok){RESET}",
+        f"{cind}│  {CYAN}{resp!r}{RESET}",
+        f"{cind}▼",
+        f"{' ' * (chosen_col - 1)}END",
+    ]
+    return "\n".join(out)
+
+
 # ─────────────────────────── verbose tracer ─────────────────────────────────
 
 def trace_router(router: str, trace: Trace) -> str:
@@ -940,6 +1092,7 @@ def print_case(router: str, message: str, expected: str | None, trace: Trace):
 
     print()
     print(h(f"router={router}  ·  {message!r}{correct_mark}"))
+    print(paint_graph(router, trace))
 
     print(f"  STICKY GATE")
     print(indent(trace_gate(trace)))
@@ -1073,6 +1226,33 @@ Running `python3 compare.py --router embeddings --message "I was charged twice"`
 
 ```
 ─── router=embeddings  ·  'I was charged twice' ────────────────────────────
+                 START
+                   │
+                   ▼
+  ┌──────────────────────────────────┐
+  │ router · embeddings              │    47ms · $0.000000
+  └────────────────┬─────────────────┘
+                   │  top cosine 0.68 → 'billing'
+                   ▼
+  ┌──────────────────────────────────┐
+  │ intent_dispatch                  │  conditional edge on state.intent
+  └────────────────┬─────────────────┘
+                   │
+                   ▼
+      ┌─────────────┼─────────────┬─────────────┐
+      │             │             │             │
+      ▼             ▼             ▼             ▼
+ ┌─────────┐  ┌─────────┐  ┌─────────┐  ┌─────────┐
+ │ account │  │ billing │  │technical│  │ chitchat│
+ └─────────┘  └─────────┘  └─────────┘  └─────────┘
+                   │  gpt-4o · 612ms · $0.000290 · (48→13 tok)
+                   │  'Reviewing the last 2 invoices for duplicate charges.'
+                   ▼
+                  END
+  STICKY GATE
+     sticky state on entry: (none)
+     decision: no sticky flow
+     → falling through to router
   ROUTER  (47.2ms · $0.000000)
      model: text-embedding-3-small
      cosine similarity scores:
@@ -1089,6 +1269,8 @@ Running `python3 compare.py --router embeddings --message "I was charged twice"`
      tokens:   48 prompt + 13 completion  → $0.000250
   TOTAL: 659ms · $0.000290
 ```
+
+The box-and-arrow block at the top is the **live flow trace**: the message's path through the graph, with the router's decision and the handler's response threaded along the edges. The `STICKY GATE / ROUTER / HANDLER` blocks below drill into each node's internals. The REPL (`agent.py`) prints the flow trace on every turn by default; pass `-v` to also show the detail blocks.
 
 Every router prints the same shape but its own internals — the **matched keyword** for rules, the **raw model response** for the LLM classifier, the **fall-through decision** for hybrid. Turn it on in the presentation and people see the routing decision happen in front of them.
 
@@ -1201,18 +1383,25 @@ For when you want to type messages yourself and see one router's behavior turn-b
 
 ```python
 # agent.py
-"""REPL. `python3 agent.py --router llm` picks which router drives the graph."""
+"""REPL. `python3 agent.py --router llm` picks which router drives the graph.
+
+Every turn prints the live flow trace (START → router → intent_dispatch →
+<intent>_handler → END) with latency, cost, and the router's decision on the
+edges. Pass -v/--verbose to additionally dump the router internals (cosine
+scores, raw LLM response, etc.) and the handler's full system + response."""
 from __future__ import annotations
 
 import argparse
 import asyncio
 
 from graph import build_graph
+from compare import paint_graph, print_case
 
 
-async def chat(router: str):
+async def chat(router: str, verbose: bool):
     graph = build_graph(router)
-    print(f"Support Agent · router={router}  (blank line to exit)\n")
+    mode = "verbose" if verbose else "flow"
+    print(f"Support Agent · router={router} · {mode}  (blank line to exit)\n")
     while True:
         try:
             msg = input("you › ").strip()
@@ -1223,10 +1412,13 @@ async def chat(router: str):
             return
         result = await graph.ainvoke({"message": msg})
         tr = result["trace"]
-        print(
-            f"  [intent={tr.intent}  router={tr.router_ms:.0f}ms/${tr.router_cost:.5f}  "
-            f"handler={tr.handler_ms:.0f}ms/${tr.handler_cost:.5f}]"
-        )
+        if verbose:
+            # Reuse compare.py's full per-message renderer — no "expected"
+            # label in free chat.
+            print_case(router, msg, None, tr)
+        else:
+            # Flow-only: the message walks through each node of the graph.
+            print(paint_graph(router, tr))
         print(f"agent › {result['response']}\n")
 
 
@@ -1234,8 +1426,10 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--router", default="hybrid",
                     choices=["rules", "embeddings", "llm", "hybrid"])
+    ap.add_argument("-v", "--verbose", action="store_true",
+                    help="Also print router internals and handler I/O.")
     args = ap.parse_args()
-    asyncio.run(chat(args.router))
+    asyncio.run(chat(args.router, args.verbose))
 
 
 if __name__ == "__main__":
@@ -1248,9 +1442,10 @@ if __name__ == "__main__":
 >
 > ```bash
 > python3 agent.py --router llm          # or: rules | embeddings | hybrid
+> python3 agent.py --router llm -v       # same, plus router internals + handler I/O
 > ```
 >
-> You'll get a `you ›` prompt. Type a message, hit enter, and the agent prints the chosen intent, router latency/cost, handler latency/cost, and the handler's reply. Exit by submitting a blank line or Ctrl-D.
+> You'll get a `you ›` prompt. Type a message, hit enter, and the agent prints the **live flow trace** — a box-and-arrow walk through each node of the graph (`START → router → intent_dispatch → <intent>_handler → END`), with latency, cost, the router's decision on the edge into dispatch, and the handler's response on the edge into END. Exit by submitting a blank line or Ctrl-D.
 >
 > Try the same message against each router in turn (`--router rules`, then `--router embeddings`, etc.) and watch where they disagree. A good one to start with: *"I think something got double-billed on my card last friday"* — the rule-based router will trip on "card", embeddings will likely pick billing, and the LLM will get it clearly right. Seeing this live drives home the trade-off the summary table only hints at.
 

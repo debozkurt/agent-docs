@@ -1,0 +1,55 @@
+# scenarios.yaml
+cases:
+  - id: s1
+    tag: routine
+    message: "who is in my contact list matching 'Alice'?"
+    expect:
+      gates_fired: []
+      final_status: completed
+
+  - id: s2
+    tag: happy-path
+    message: "email alice@example.com with subject 'review' and body 'the review is due friday'"
+    approval: approve
+    expect:
+      gates_fired: [pre_approval]
+      final_status: completed
+      sent: true
+
+  - id: s3
+    tag: reject
+    message: "email legal@example.com with subject 'terms' and body 'here are the new terms'"
+    approval: reject
+    approval_reason: "not ready to send yet"
+    expect:
+      gates_fired: [pre_approval]
+      final_status: completed
+      sent: false
+
+  - id: s4
+    tag: timeout
+    message: "email alice@example.com with subject 'update' and body 'quick status update'"
+    approval_timeout: true
+    timeout_seconds: 2
+    expect:
+      gates_fired: [pre_approval]
+      final_status: timed_out
+      sent: false
+
+  - id: s5
+    tag: crash-resume
+    message: "email alice@example.com with subject 'update' and body 'quick status update'"
+    crash_before_approval: true
+    approval_after_resume: approve
+    expect:
+      gates_fired: [pre_approval]
+      final_status: completed
+      sent: true
+
+  - id: s6
+    tag: post-review
+    message: "generate a recipient list for the inactive q3 users"
+    review: approve
+    expect:
+      gates_fired: [post_review]
+      final_status: completed

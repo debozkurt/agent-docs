@@ -1,0 +1,64 @@
+# messages.yaml
+# Ground-truth routing fixture. `expected` is the intent a reasonable human
+# would pick. `kind` categorizes the difficulty so compare.py can break down
+# accuracy by difficulty.
+cases:
+  - id: c1
+    message: "hey"
+    expected: chitchat
+    kind: clear
+
+  - id: c2
+    message: "thanks!"
+    expected: chitchat
+    kind: clear
+
+  - id: c3
+    message: "I can't log into my account"
+    expected: account
+    kind: clear
+
+  - id: c4
+    message: "how do I enable two-factor authentication"
+    expected: account
+    kind: clear
+
+  - id: c5
+    message: "why was I charged twice this month"
+    expected: billing
+    kind: clear
+
+  - id: c6
+    message: "can I get a refund for the last invoice"
+    expected: billing
+    kind: clear
+
+  - id: c7
+    message: "what's the difference between the Pro and Team plans"
+    expected: billing
+    kind: clear
+
+  - id: c8
+    message: "how do I enable SSO for my organization"
+    expected: technical
+    kind: clear
+
+  - id: c9
+    message: "could you walk me through setting up the webhook for order events"
+    expected: technical
+    kind: natural_phrasing
+
+  - id: c10
+    message: "my dashboard isn't loading after the update"
+    expected: technical
+    kind: natural_phrasing
+
+  - id: c11
+    message: "I think something got double-billed on my card last friday"
+    expected: billing
+    kind: natural_phrasing
+
+  - id: c12
+    message: "I was charged twice and also I can't reset my password"
+    expected: billing
+    kind: multi_intent
